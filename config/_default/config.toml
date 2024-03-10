@@ -1,5 +1,5 @@
 # Change baseurl before deploy
-baseurl = "https://lamply.github.io/hugo_stack_pages/"
+baseurl = ""
 languageCode = "zh-cn"
 paginate = 25
 title = "次二小栈"
