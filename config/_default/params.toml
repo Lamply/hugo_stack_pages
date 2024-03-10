@@ -76,7 +76,7 @@ enabled = true
 ## Comments
 [comments]
 enabled = true
-provider = "disqus"
+provider = "giscus"
 
 [comments.disqusjs]
 shortname = ""
@@ -127,7 +127,7 @@ serverName = "cactus.chat"
 siteName = ""
 
 [comments.giscus]
-repo = ""
+repo = "Lamply/hugo_stack_pages"
 repoID = ""
 category = ""
 categoryID = ""
