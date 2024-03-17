@@ -3,6 +3,7 @@ title: 关于 LRA 和 Force Regularization 的探索
 date: 2018-08-07
 categories: 
     - 技术经验
+tags: 
     - 模型加速和压缩
 ---
 这部分是将《Coordinating Filters for Faster Deep Neural Networks》中提到的 _Force Regularization_ 和 _LRA_ 用于实际项目的效果，虽然现在看来不是很严谨，不过算是一次很好的尝试。

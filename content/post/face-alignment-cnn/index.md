@@ -4,6 +4,7 @@ date: 2018-07-19
 image: 1.png
 categories:
     - 技术经验
+tags: 
     - 人脸对齐
 ---
 

@@ -3,10 +3,10 @@ title: TensorRT视频流推理速度异常记录
 date: 2022-06-28
 description: 想要极致的N卡加速或许需要英伟达的协助
 categories: 
-    - 模型加速和压缩
     - 问题记录
 tags: 
     - TensorRT
+    - 模型加速和压缩
 ---
 links: [[2022-06-27-Week]], [[103-问题汇总#^7d1ab9]]
 

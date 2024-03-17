@@ -2,7 +2,7 @@
 title: 零核现象
 date: 2018-04-19
 categories: 
-    - 观测
+    - 问题记录
 ---
 <div align=center>
 <img src="TingMengDe.bmp">  

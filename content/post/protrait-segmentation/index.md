@@ -4,6 +4,7 @@ date: 2019-04-19
 image: Einstein.png
 categories: 
     - 技术经验
+tags: 
     - 语义分割
 ---
 
