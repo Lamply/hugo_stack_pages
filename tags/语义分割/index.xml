@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>语义分割 on 次二小栈</title><link>/tags/%E8%AF%AD%E4%B9%89%E5%88%86%E5%89%B2/</link><description>Recent content in 语义分割 on 次二小栈</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><lastBuildDate>Fri, 19 Apr 2019 00:00:00 +0000</lastBuildDate><atom:link href="/tags/%E8%AF%AD%E4%B9%89%E5%88%86%E5%89%B2/index.xml" rel="self" type="application/rss+xml"/><item><title>人像分割</title><link>/p/%E4%BA%BA%E5%83%8F%E5%88%86%E5%89%B2/</link><pubDate>Fri, 19 Apr 2019 00:00:00 +0000</pubDate><guid>/p/%E4%BA%BA%E5%83%8F%E5%88%86%E5%89%B2/</guid><description>&lt;img src="/p/%E4%BA%BA%E5%83%8F%E5%88%86%E5%89%B2/Einstein.png" alt="Featured image of post 人像分割" />&lt;p>这部分是关于在低计算量下完成人像分割的工作，因为时间充裕，所以调查尝试得比较多，最终完成的效果还不错。&lt;/p>
+&lt;h2 id="引言">引言&lt;/h2>
+&lt;p>人像分割（portrait segmentation）属于语义分割的子集，某种程度上类似于只专注人的前景分割，可以看成是二分类的语义分割。不过这里的应用场景是半身肖像，对于效果的评价更加专注于分割边缘和细节的质量，现在看来这次的工作在这方面其实做得比较一般，只是就通常的 IoU 意义上来看还不错。&lt;/p>
+&lt;p>总体来说，人像分割方面的论文比较少，典型的就是 Xiaoyong Shen 等人的工作 [1] [2]。不过实际尝试过程中发现，其中的很多技巧无法有效的应用于低计算量的场景中，固定先验的引入也会导致分割效果在某些情况下变差。&lt;/p>
+&lt;h2 id="实现">实现&lt;/h2>
+&lt;h3 id="数据集">数据集&lt;/h3>
+&lt;p>数据集方面因为我采取了逐步迁移训练，多次 fine-tuning 的方式，所以需要从 ImageNet 到 COCO 人像子集再到标准半身人像分割的数据集。COCO 人像子集是从 COCO 中筛选出含人类（且占面积较大）的部分，大约 4 万张；半身人像分割的数据集训练集一千多张，验证集 50 张，测试集 300 张；还有一些私有的测试集。&lt;br>
+之所以这样做主要是因为最终用于应用场景的数据集过少，而且从 OSVOS[3] 等文中得到了更多的启发。&lt;/p>
+&lt;div align=center>
+&lt;img src="osvos.png">
+OSVOS 的做法
+&lt;/div>
+&lt;h3 id="设计">设计&lt;/h3>
+&lt;p>我主要尝试了 ENet [4]、FCN [5]、FCN dilated convolution 版本 [6]、UNet [7] 的改进版 以及 类 DeepLab V3+ [8] 中的方法。为了保持计算量，除了 [4] 外，我都采用了轻量化网络 ShuffleNet [9] 作为 backbone 来进行复现，大部分网络的输入限制为 224x224。&lt;/p>
+&lt;p>对于 UNet 的改进版，因为是冲着实时而设计的，所以在 decoder 的设计上，尤其是底层特征的引入上显著减少了滤波器数量。当 output stride 为 4 时，可以得到的模型性能为：参数量 79.54K, FLOPS 24.44M, 访存量 46.98MB，可以达到实时。&lt;/p>
+&lt;p>对于类 DeepLab V3+ 的版本，为了尽可能的压缩计算量，我最大限度的利用了 Depthwise Convolution、Dilation 以及 Channel Shuffle 的特性，同时为平衡精度将 output stride 限制为 2（损失非常少），decoder 也改成了更为节省计算量的简单版本，模型性能为：参数量 965.49K, FLOPS 743.37M, 访存量 392.87MB。&lt;/p>
+&lt;blockquote>
+&lt;ul>
+&lt;li>&lt;em>来自底层特征的 skip-connection 是有很明显的边缘细化效果的，但同时也十分容易过拟合，这是值得注意的问题。&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;ul>
+&lt;li>&lt;em>尽管我把 ASPP 写的很省，但尝试后发现如果那个结构不加 ASPP 的话性能会很差。&lt;/em>&lt;/li>
+&lt;li>&lt;em>关于深度，尝试的结果似乎说明了 Encoder 部分需要足够的深（至少 8 个 res block 是不够的），而 Decoder 则不需要太复杂（没有足够的证据，不过增加 2 层能带来的好处不大）&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;h3 id="训练">训练&lt;/h3>
+&lt;p>训练方面，UNet（实时） 和 类 DeepLab V3+ 方法因为是从头搭起，所以就像上面说的一样，需要两次 fine-tuning，其余方法并没有经过 COCO 人像预训练。优化方法我用的是 SGD+Momentum，事实上这是因为用其他的一些优化方法会导致“零核现象”的发生，我在以前的一篇文章中分析过这点，不知道这个现象和性能的下降有多大关系，但如果用 SGD 的话就不会有这种事情发生，而且性能会更好。&lt;/p>
+&lt;blockquote>
+&lt;ul>
+&lt;li>&lt;em>COCO 人像部分的预训练的加入很有效，但是必须使用和应用场景十分相似的部分作为预训练才有效，不筛选的话很可能没有效果上的影响。&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;ul>
+&lt;li>&lt;em>使用大 Momentum（我用的 0.99）似乎不错，训练速度会很快而且效果也不会差（实验尝试似乎比 0.9 还要好）。&lt;/em>&lt;/li>
+&lt;li>&lt;em>实际训练时还发现有挺严重的过拟合，所以做了些数据集扩增，结果挺有效的。&lt;/em>&lt;/li>
+&lt;li>&lt;em>在 output stride 为 8 时增加一个辅助损失也是有效的。&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;h3 id="测试">测试&lt;/h3>
+&lt;p>在 [1] 中给出的数据集中测试结果如下（其中我加入了 Std 度量用于观察分割的稳定性，意为 IoU 的标准差）&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Method&lt;/th>
+&lt;th style="text-align:center">mIoU&lt;/th>
+&lt;th style="text-align:center">Std&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">ENet&lt;/td>
+&lt;td style="text-align:center">94.04%&lt;/td>
+&lt;td style="text-align:center">6.25%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">FCN&lt;/td>
+&lt;td style="text-align:center">95.73%&lt;/td>
+&lt;td style="text-align:center">3.10%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">FCN + dilated&lt;/td>
+&lt;td style="text-align:center">96.04%&lt;/td>
+&lt;td style="text-align:center">3.27%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">UNet（实时）&lt;/td>
+&lt;td style="text-align:center">95.32%&lt;/td>
+&lt;td style="text-align:center">4.03%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">类 DeepLab V3+&lt;/td>
+&lt;td style="text-align:center">96.4%&lt;/td>
+&lt;td style="text-align:center">3.25%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">PortraitFCN+[1]&lt;/td>
+&lt;td style="text-align:center">95.91%&lt;/td>
+&lt;td style="text-align:center">-&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>另外我还自己标了个五十多张明暗、运动、背景复杂度变化都比较大的测试图片，在此数据集上测试结果为&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Method&lt;/th>
+&lt;th style="text-align:center">mIoU&lt;/th>
+&lt;th style="text-align:center">Std&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">ENet&lt;/td>
+&lt;td style="text-align:center">61.42%&lt;/td>
+&lt;td style="text-align:center">20.04%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">FCN&lt;/td>
+&lt;td style="text-align:center">87.71%&lt;/td>
+&lt;td style="text-align:center">12.01%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">FCN + dilated&lt;/td>
+&lt;td style="text-align:center">89.43%&lt;/td>
+&lt;td style="text-align:center">10.62%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">UNet（实时）&lt;/td>
+&lt;td style="text-align:center">91.96%&lt;/td>
+&lt;td style="text-align:center">3.95%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">类 DeepLab V3+&lt;/td>
+&lt;td style="text-align:center">93.7%&lt;/td>
+&lt;td style="text-align:center">2.3%&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>可以看到类 DeepLab V3+ 方法测试结果还是挺不错的，其余的多个私有测试集上表现也不错，它在 MIX2 上前向一张图片大概需要 120ms。除此之外，达到实时性能的 UNet 改进版也不错，两者在 P-R 曲线上差异不是很大。&lt;/p>
+&lt;div align=center>
+&lt;img src="performance.png" width="80%">
+非实时与实时网络的 P-R 曲线比较
+&lt;/div>
+&lt;h2 id="最终的效果">最终的效果&lt;/h2>
+&lt;div align=center>
+&lt;img src="full.png" width="70%">
+&lt;/div>
+&lt;p>可以看到边缘的跟踪还是不错的，除此之外，头发的细节处理也可以在顶部图中看到。&lt;/p>
+&lt;p>因为 output stride 为 2 导致分割边缘在放大后加大了间隔，看上去和实际边缘有些距离。在下面的图中可以明显看到这种在人和物件之间的边界、甚至透明物件覆盖影响下算法的处理情况。&lt;/p>
+&lt;div align=center>
+&lt;img src="pony.png" width="70%">
+&lt;/div>
+&lt;p>虽然训练集全都是单人肖像，但多人的情况也能够分割，具体效果还是要看人物所占的尺度等。&lt;/p>
+&lt;div align=center>
+&lt;img src="multi.jpg" width="70%">
+&lt;/div>
+&lt;p>[参考文献]:&lt;br>
+[1] &lt;a class="link" href="http://xiaoyongshen.me/webpage_portrait/papers/portrait_eg16.pdf" target="_blank" rel="noopener"
+>《Automatic Portrait Segmentation for Image Stylization》&lt;/a>&lt;br>
+[2] &lt;a class="link" href="https://arxiv.org/pdf/1704.08812.pdf" target="_blank" rel="noopener"
+>《Automatic Real-time Background Cut for Portrait Videos》&lt;/a>&lt;br>
+[3] &lt;a class="link" href="http://openaccess.thecvf.com/content_cvpr_2017/papers/Caelles_One-Shot_Video_Object_CVPR_2017_paper.pdf" target="_blank" rel="noopener"
+>《One-Shot Video Object Segmentation》&lt;/a>&lt;br>
+[4] &lt;a class="link" href="https://arxiv.org/pdf/1606.02147.pdf" target="_blank" rel="noopener"
+>《ENet: A Deep Neural Network Architecture forReal-Time Semantic Segmentation》&lt;/a>&lt;br>
+[5] &lt;a class="link" href="https://arxiv.org/pdf/1411.4038.pdf" target="_blank" rel="noopener"
+>《Fully Convolutional Networks for Semantic Segmentation》&lt;/a>&lt;br>
+[6] &lt;a class="link" href="https://arxiv.org/pdf/1702.08502.pdf" target="_blank" rel="noopener"
+>《Understanding Convolution for Semantic Segmentation》&lt;/a>&lt;br>
+[7] &lt;a class="link" href="https://arxiv.org/pdf/1505.04597.pdf" target="_blank" rel="noopener"
+>《U-Net: Convolutional Networks for BiomedicalImage Segmentation》&lt;/a>&lt;br>
+[8] &lt;a class="link" href="https://arxiv.org/pdf/1802.02611.pdf" target="_blank" rel="noopener"
+>《Encoder-Decoder with Atrous SeparableConvolution for Semantic Image Segmentation》&lt;/a>&lt;br>
+[9] &lt;a class="link" href="https://arxiv.org/pdf/1707.01083.pdf" target="_blank" rel="noopener"
+>《ShuffleNet: An Extremely Efficient Convolutional Neural Network for MobileDevices》&lt;/a>&lt;/p></description></item><item><title>DeepLab系列论文简略记录</title><link>/p/deeplab%E7%B3%BB%E5%88%97%E8%AE%BA%E6%96%87%E7%AE%80%E7%95%A5%E8%AE%B0%E5%BD%95/</link><pubDate>Thu, 01 Mar 2018 00:00:00 +0000</pubDate><guid>/p/deeplab%E7%B3%BB%E5%88%97%E8%AE%BA%E6%96%87%E7%AE%80%E7%95%A5%E8%AE%B0%E5%BD%95/</guid><description>&lt;p>这部分是关于语义分割网络 DeepLab 系列的三篇论文。尽管经验性的技巧很多，但就效果而言还是很不错的，有不少值得参考的地方。&lt;/p>
+&lt;h2 id="deeplab-semantic-image-segmentation-with-deep-convolutional-nets-atrous-convolution-and-fully-connected-crfs">DeepLab: Semantic Image Segmentation with Deep Convolutional Nets, Atrous Convolution, and Fully Connected CRFs&lt;/h2>
+&lt;p>三个贡献:&lt;/p>
+&lt;ol>
+&lt;li>明确表明了上采样滤波器或者叫 &amp;lsquo;空洞卷积&amp;rsquo; 是 dense prediction 任务中的重要工具. 空洞卷积允许明确控制滤波器在计算特征响应后的分辨率, 也允许有效放大滤波器的感受野, 从而无计算量和参数量增加地聚合更大的上下文信息&lt;/li>
+&lt;li>提出了空间金字塔空洞池化 ( ASPP ), 能在多尺度上分割物体&lt;/li>
+&lt;li>结合 DCNN 和概率图模型提升边缘准确度&lt;/li>
+&lt;/ol>
+&lt;p>方法简述：将后面一层 pooling 和 conv stride 改为 1, 换成 atrous conv, 最后并行多个不同 rate 的 atrous conv, 然后 fuse 在一起. 加上多尺度输入, COCO 预训练, randomly rescaling 扩增, CRF, 最终得出结果。&lt;/p>
+&lt;h2 id="rethinking-atrous-convolution-for-semantic-image-segmentation">Rethinking Atrous Convolution for Semantic Image Segmentation&lt;/h2>
+&lt;p>针对多尺度分割, 设计了级联或并联的 atrous conv 模块, 改进了 ASPP, 没有 CRF 后处理也达到了 SOTA&lt;/p>
+&lt;ul>
+&lt;li>Multi-grid Method
+&lt;ul>
+&lt;li>一个 block 内几个卷积, 分不同的 dilation rate, 比如三个卷积则原来 { 1,1,1 } 可以变为 { 1,2,4 }, 然后乘上该 block 的 dilation rate. 也就是说本来要 stride 2 的, 改用 atrous conv 后, 后面 block 卷积的 dilation rate 为 2 x { 1,2,4 } = { 2,4,8 }&lt;/li>
+&lt;li>但是 ResNet 的 block 难道不是只有一个 3x3 ??? 1x1 哪来的 dilation ???? 原文没有提及, github 有相关讨论, 大致可能一是 google 所用 ResNet Block 加了三个 3x3 卷积, 二是指多个 bottleneck 内的 3x3 卷积做 multi-grid&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>ASPP
+&lt;ul>
+&lt;li>加上 batch normalization&lt;/li>
+&lt;li>dilation rate 过大会导致 valid 的 weights 减少 ( 非 pad 0 区域与 filters 区域相交减小 ), 这会导致大 dilation rate 的 filters 退化, 为解决这个问题, 且整合 global context, 使用了 image-level 的 feature. 特别的, 在模型最后的 feature map 采用 global average pooling, 然后送进 256 个 1x1 卷积 BN 中, 然后双线性插值到需要的维度.&lt;/li>
+&lt;li>最终 ASPP 有: 一个 1x1, 三个 3x3 dilation rate { 6,12,18 } ( 缩小 16 倍时 ), 以及 image-level feature, 最终 concat 在一起做 1x1 卷积. 其中卷积都是 256 output channel 和 BN.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>&lt;em>&lt;strong>原文提及主要性能提升来自于 Batch Normalization 的引入及 COCO 预训练. 实际本人尝试在小数据集上从 16s 到 8s 冻结 Batch Normalization 做 finetune, 最终效果并没有提升, 可能真的要在大量数据下才能得到较好的 Batch Normalization 参数做初始化吧&lt;/strong>&lt;/em>&lt;/p>
+&lt;h2 id="encoder-decoder-with-atrous-separable-convolution-for-semantic-image-segmentation">Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation&lt;/h2>
+&lt;p>融合了 Encoder-Decoder 和 SPP, 加上 depthwise 卷积的大量使用&lt;/p>
+&lt;h3 id="methods">Methods&lt;/h3>
+&lt;ol>
+&lt;li>Atrous Convolution 的 Encoder-Decoder&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>Encoder 阶段改进 Xception + DeepLabv3, 主要改进点为 &lt;em>atrous separable convolution&lt;/em>, 其实就是都大量使用 depthwise 卷积替换 ASPP 等卷积结构, 可以显著的降低计算复杂度并保持相似或更好的性能&lt;/li>
+&lt;li>Decoder 阶段在 DeepLabv3 输出端上采样 ( output_stride = 16 下 4 倍 ), 然后 concat 一个经过 1x1 降维后的网络低层特征, 再做 3x3 卷积, 然后上采样到原图大小. 这里也可以采用 depthwise 卷积提升效率.&lt;/li>
+&lt;/ul>
+&lt;ol start="2">
+&lt;li>修改 Xception&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>除输入流外加入了更多的层数&lt;/li>
+&lt;li>去掉 max-pooling, 以 stride depthwise 卷积替代&lt;/li>
+&lt;li>所有 3x3 depthwise 后加 batchnorm 和 ReLU &lt;em>&lt;strong>( 这个 ReLU 效果存疑 )&lt;/strong>&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;h3 id="experiments">Experiments&lt;/h3>
+&lt;ol>
+&lt;li>关于 Decoder 的设计实验&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>这部分作者实验发现 Decoder 引入 before striding 的同分辨率 feature map 然后做 1x1 卷积压缩到 48 channel 再进行 concat 效果最好, 不过 mIoU 差距都比较小, 而且 64 channel 效果更差可以看出该选择可能与 Encoder 输出通道比例有关联, 玄学成分多些&lt;/li>
+&lt;li>还有就是 concat 后两个 3x3 256 卷积性能最好, 而且只做一个 skip-connection 会更高效&lt;/li>
+&lt;/ul>
+&lt;ol start="2">
+&lt;li>关于 Network Backbone&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>这里比较重要的一点就是 Decoder 的加入会带来 1%~2% 的性能提升, 这点在训练和测试相同 output stride 的情况下会比较明显, 不同的情况下比较不明显. ___( 这里总体计算量会增加几十 B, 个人认为在轻量级网络下不划算, 还是希望能有不会明显增加计算量的 decoder ) ___&lt;/li>
+&lt;li>另外, 作者使用 Xception 实验时发现 multi-grid 不会提升性能, 于是没有使用&amp;hellip;&amp;hellip;&amp;hellip;&amp;hellip;&amp;hellip;..&lt;/li>
+&lt;li>关于 pretrain, 在 COCO 上 pretrain 会带来大约 2% 的提升, 在 JFT 上 pretrain backbone 会再额外带来大约 1% 的提升&lt;/li>
+&lt;/ul>
+&lt;h3 id="conclusion">Conclusion&lt;/h3>
+&lt;p>DeepLabv3+ 采用 Encoder-Decoder 结构, 将 DeepLabv3 作为 Encoder, 并引入简单高效的 skip-connection 来恢复边缘. 还有就是改进 Xception 以及采用 atrous separable convolution 降低计算量. 总的来说没什么新鲜的, 都是整合之前的方法然后通过大量实验找到的最优最高效的结构, 或许这就是炼金术吧&amp;hellip;&amp;hellip;&lt;/p></description></item></channel></rss>

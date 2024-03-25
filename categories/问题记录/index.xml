@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>问题记录 on 次二小栈</title><link>/categories/%E9%97%AE%E9%A2%98%E8%AE%B0%E5%BD%95/</link><description>Recent content in 问题记录 on 次二小栈</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><lastBuildDate>Tue, 28 Jun 2022 00:00:00 +0000</lastBuildDate><atom:link href="/categories/%E9%97%AE%E9%A2%98%E8%AE%B0%E5%BD%95/index.xml" rel="self" type="application/rss+xml"/><item><title>TensorRT视频流推理速度异常记录</title><link>/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/</link><pubDate>Tue, 28 Jun 2022 00:00:00 +0000</pubDate><guid>/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/</guid><description>&lt;p>links: [[2022-06-27-Week]], [[103-问题汇总#^7d1ab9]]&lt;/p>
+&lt;p>这个问题是在优化云端模型时出现的，设计了个更小的模型准备替换大的模型，结果发现模拟视频推理时耗时会出现异常波动，最终达不到优化预期。经过分析发现只在两次推理之间存在一点时间间隔时才会出现这个问题，很是诡异。因为是在云端容器上跑的，没法进行 Nsight 分析，而且我也不懂 GPU，只能默默记录下来。&lt;/p>
+&lt;p>环境：&lt;/p>
+&lt;ul>
+&lt;li>Ubuntu 16.04&lt;/li>
+&lt;li>TensorRT 7.2.1&lt;/li>
+&lt;li>CUDA 10.2&lt;/li>
+&lt;li>cuDNN 8.0&lt;/li>
+&lt;li>Python 3.6&lt;/li>
+&lt;li>PyTorch 1.7.1&lt;/li>
+&lt;li>torch2trt 0.1.0&lt;/li>
+&lt;li>Tesla T4&lt;/li>
+&lt;li>Intel(R) Xeon(R) Platinum 8255C CPU @ 2.50GHz（up to 10-core）&lt;/li>
+&lt;/ul>
+&lt;p>模型构成：&lt;/p>
+&lt;ol>
+&lt;li>localL（优化 nnt 版本） 和 localC 模型转换成 TensorRT 引擎&lt;/li>
+&lt;li>FP16 和 INT8&lt;/li>
+&lt;li>1024x576 和 768x448 推理分辨率&lt;/li>
+&lt;li>初始化预热 20 次&lt;/li>
+&lt;/ol>
+&lt;p>分解测试流程为几个步骤：&lt;/p>
+&lt;ol>
+&lt;li>OpenCV 从 nas 盘读取视频（I/O），转换成 YUV 字节流，以及其余模拟线上环境的配置和 log（I/O）&lt;/li>
+&lt;li>脚本前处理，涉及 to device 数据传输和少量 CUDA 计算&lt;/li>
+&lt;li>模型推理，里面是黑箱，涉及显卡内部计算和传输，不涉及 to host 数据传输&lt;/li>
+&lt;li>脚本后处理，涉及 to host 数据传输和少量 CUDA 计算&lt;/li>
+&lt;li>后续 log（I/O），以及调用 &lt;code>time.sleep&lt;/code> 系统睡眠模拟流式处理保持帧率&lt;/li>
+&lt;/ol>
+&lt;p>存在三种场景，未能达成可预见的统一：&lt;/p>
+&lt;ol>
+&lt;li>测试模型推理，采用相同输入的连续推理的形式&lt;/li>
+&lt;li>测试脚本，不涉及线上环境模拟部分&lt;/li>
+&lt;li>测试线上环境&lt;/li>
+&lt;/ol>
+&lt;p>测试方法只记录脚本内部（步骤 2，3，4）耗时，采用 &lt;code>torch.cuda.synchronize()&lt;/code>+&lt;code>timeit.default_timer()&lt;/code> 的方式严格记录每一步耗时&lt;/p>
+&lt;h2 id="实验一">实验一&lt;/h2>
+&lt;p>localL 1024x576 FP16 和 INT8 做 baseline&lt;/p>
+&lt;p>测试线上环境，52 帧视频流：&lt;/p>
+&lt;ul>
+&lt;li>FP16 耗时 19ms（模型 17ms），GPU 占用 40% 左右，模型推理在一定范围内波动
+&lt;ul>
+&lt;li>&lt;img src="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628163611.webp"
+width="374"
+height="247"
+srcset="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628163611_hu9b4516e03a97615eb57f73f74e85dd06_9778_480x0_resize_q75_h2_box_2.webp 480w, /p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628163611_hu9b4516e03a97615eb57f73f74e85dd06_9778_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="151"
+data-flex-basis="363px"
+>&lt;/li>
+&lt;li>前后处理耗时在个别时候有剧烈变化&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>INT8 耗时 15ms（模型 13.2ms），模型推理波动很小
+&lt;ul>
+&lt;li>&lt;img src="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628170236.webp"
+width="386"
+height="244"
+srcset="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628170236_hu5b635d502ec56feee62cd684edacef57_7148_480x0_resize_q75_h2_box_2.webp 480w, /p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628170236_hu5b635d502ec56feee62cd684edacef57_7148_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="158"
+data-flex-basis="379px"
+>&lt;/li>
+&lt;li>前后处理耗时在个别时候有剧烈变化&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>测试脚本，循环 100 次：&lt;/p>
+&lt;ul>
+&lt;li>FP16 耗时 20.5ms（模型 18.8ms），GPU 占用 90% 以上，模型推理耗时依然波动
+&lt;ul>
+&lt;li>&lt;img src="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628162953.webp"
+width="376"
+height="249"
+srcset="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628162953_hu787089145284c611b1aed997b16e9843_6684_480x0_resize_q75_h2_box_2.webp 480w, /p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628162953_hu787089145284c611b1aed997b16e9843_6684_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="151"
+data-flex-basis="362px"
+>&lt;/li>
+&lt;li>耗时比测试线上环境高，怀疑是 GPU 占用原因&lt;/li>
+&lt;li>添加 20ms 延时，耗时降低回 16.8ms 水平（比线上稍低一些），波动更明显更规律&lt;/li>
+&lt;li>&lt;img src="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628163236.webp"
+width="373"
+height="248"
+srcset="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628163236_hu5ed591b04cfbdd40682693e4e19c2838_8062_480x0_resize_q75_h2_box_2.webp 480w, /p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628163236_hu5ed591b04cfbdd40682693e4e19c2838_8062_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="150"
+data-flex-basis="360px"
+>&lt;/li>
+&lt;li>前后处理耗时在个别时候有剧烈变化&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>INT8 模型推理耗时有分层情况出现，稳定后和线上环境耗时一致，延长预热后分层消失
+&lt;ul>
+&lt;li>&lt;img src="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628170625.webp"
+width="388"
+height="249"
+srcset="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628170625_huc68952150e9055d5b0ef071f74d68e63_6454_480x0_resize_q75_h2_box_2.webp 480w, /p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628170625_huc68952150e9055d5b0ef071f74d68e63_6454_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="155"
+data-flex-basis="373px"
+>&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>测试模型推理，预热 20 次，循环 100 次：
+- FP16 耗时 20.4ms，GPU 跑满
+- INT8 耗时 15.4ms，GPU 跑满&lt;/p>
+&lt;p>疑问：&lt;/p>
+&lt;ol>
+&lt;li>为什么推理时间会有规律性波动&lt;/li>
+&lt;li>为什么两次推理之间的间隔会影响 GPU 推理速度（为什么连续推理会更慢）&lt;/li>
+&lt;li>为什么前后处理耗时会偶现高峰值&lt;/li>
+&lt;/ol>
+&lt;p>自答：&lt;/p>
+&lt;ul>
+&lt;li>上述几个问题都表明了一个现象，就是 TensorRT 推理时延和 GPU 利用率相关，这也是几种测试场景下出现不一致的主要原因&lt;/li>
+&lt;li>GPU 利用率是统计数据，真正的原因或许在于 GPU 内部管理程序有一定的耗时，两次推理之间必需要经过这一段时间，所以利用 GPU 的空闲时间可以掩盖掉这部分耗时，但当 GPU 相当繁忙时（常有的事）这部分耗时就会显露出来&lt;/li>
+&lt;li>还有的原因或许和 TensorRT 对连续推理的优化有关，这部分暂且不清楚&lt;/li>
+&lt;li>所以实际测试按照 GPU 利用率作为标准或许会更好点，但照目前观察，耗时基本可以代表 GPU 利用率&lt;/li>
+&lt;li>当然感觉也有可能是显卡服务器平台策略有修改了什么，不好说&amp;hellip;&lt;/li>
+&lt;/ul>
+&lt;h2 id="实验二">实验二&lt;/h2>
+&lt;p>localC 768x448 FP16 INT8，小模型推理&lt;/p>
+&lt;p>测试线上环境，8000 帧视频流：&lt;/p>
+&lt;ul>
+&lt;li>INT8 模型推理时间呈现诡异的分层（50 iter 跃变，100 iter 稳定），稳定后 GPU 占用 33% 左右
+&lt;ul>
+&lt;li>&lt;img src="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628195746.webp"
+width="374"
+height="252"
+srcset="/p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628195746_hue5550d4672a4aea17d49fbcade932959_3506_480x0_resize_q75_h2_box_2.webp 480w, /p/tensorrt%E8%A7%86%E9%A2%91%E6%B5%81%E6%8E%A8%E7%90%86%E9%80%9F%E5%BA%A6%E5%BC%82%E5%B8%B8%E8%AE%B0%E5%BD%95/20220628195746_hue5550d4672a4aea17d49fbcade932959_3506_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="148"
+data-flex-basis="356px"
+>&lt;/li>
+&lt;li>可多次复现，分层的时间节点大致相同只会略有偏移&lt;/li>
+&lt;li>可以确定和延时长短有关，延时越长，分层整体越往左移&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>测试脚本，循环 800 次：
+- INT8 模型推理在添加 20ms 延时下呈现诡异分层，去掉延时则模型推理耗时正常（4.66ms）
+- FP16 模型推理在添加 20ms 延时下也呈现诡异分层，去掉延时则模型推理耗时正常（5.3ms）&lt;/p>
+&lt;p>疑问：&lt;/p>
+&lt;ol>
+&lt;li>为什么推理耗时会表现出阶梯渐慢的样子&lt;/li>
+&lt;li>为什么最终耗时会稳定在成倍增长的地步&lt;/li>
+&lt;/ol>
+&lt;p>自答：&lt;/p>
+&lt;ul>
+&lt;li>该表现可稳定复现且有明显规律，说明很可能是撞到了某内部机制的误区&lt;/li>
+&lt;li>延时越短，表现越正常；延时越长，越早出现耗时跃变，分层时间也会缩短。也就是可能和实验一是同一类问题&lt;/li>
+&lt;li>需要进一步验证&lt;/li>
+&lt;/ul>
+&lt;h2 id="实验三">实验三&lt;/h2>
+&lt;p>寻找分层规律，测试所有模型&lt;/p>
+&lt;p>测试模型推理，预热 50 次，循环 200 次（值为：毫秒）：&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">分辨率/模型&lt;/th>
+&lt;th style="text-align:center">localC FP16&lt;/th>
+&lt;th style="text-align:center">localC INT8&lt;/th>
+&lt;th style="text-align:center">localL FP16&lt;/th>
+&lt;th style="text-align:center">localL INT8&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">1024x576&lt;/td>
+&lt;td style="text-align:center">8.2&lt;/td>
+&lt;td style="text-align:center">7.2&lt;/td>
+&lt;td style="text-align:center">19.8&lt;/td>
+&lt;td style="text-align:center">15.2&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">768x448&lt;/td>
+&lt;td style="text-align:center">5.4&lt;/td>
+&lt;td style="text-align:center">4.7&lt;/td>
+&lt;td style="text-align:center">12.6&lt;/td>
+&lt;td style="text-align:center">9.9&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>测试脚本，循环 800 次，延时 20ms（值为：跃变时次数 / 稳定时次数，√ 为无分层）：&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">分辨率/模型&lt;/th>
+&lt;th style="text-align:center">localC FP16&lt;/th>
+&lt;th style="text-align:center">localC INT8&lt;/th>
+&lt;th style="text-align:center">localL FP16&lt;/th>
+&lt;th style="text-align:center">localL INT8&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">1024x576&lt;/td>
+&lt;td style="text-align:center">50/300&lt;/td>
+&lt;td style="text-align:center">60/300&lt;/td>
+&lt;td style="text-align:center">√&lt;/td>
+&lt;td style="text-align:center">√&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">768x448&lt;/td>
+&lt;td style="text-align:center">60/275&lt;/td>
+&lt;td style="text-align:center">60/175&lt;/td>
+&lt;td style="text-align:center">50/125&lt;/td>
+&lt;td style="text-align:center">60/300&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>分层稳定后耗时分别为（值为：毫秒）：&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">分辨率/模型&lt;/th>
+&lt;th style="text-align:center">localC FP16&lt;/th>
+&lt;th style="text-align:center">localC INT8&lt;/th>
+&lt;th style="text-align:center">localL FP16&lt;/th>
+&lt;th style="text-align:center">localL INT8&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">1024x576&lt;/td>
+&lt;td style="text-align:center">12.2&lt;/td>
+&lt;td style="text-align:center">12.1&lt;/td>
+&lt;td style="text-align:center">16.8&lt;/td>
+&lt;td style="text-align:center">13.2&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">768x448&lt;/td>
+&lt;td style="text-align:center">11.4&lt;/td>
+&lt;td style="text-align:center">10.1&lt;/td>
+&lt;td style="text-align:center">12.4&lt;/td>
+&lt;td style="text-align:center">12.4&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>后续实验：&lt;/p>
+&lt;ul>
+&lt;li>增长延时后全部模型都会分层，减小延时后全部模型不会分层&lt;/li>
+&lt;li>分层最终时间也与延时有关，延时越长，稳定后推理耗时越长&lt;/li>
+&lt;li>将延时函数加到 测试模型推理 场景（也就是步骤 3）中，分层现象依然可以复现，所以可以排除外设总线相关的原因，问题出现在显卡内部&lt;/li>
+&lt;/ul>
+&lt;p>自答：&lt;/p>
+&lt;ul>
+&lt;li>众所周知 TensorRT 在连续推理中做了优化，或许“连续”是指在一定时间范围内，而且这个时间范围会随模型计算量改变。也就是小模型只能在更短时间内才算连续推理，而大模型则宽裕一些。然后破坏连续推理的模式就会使模型推理速度变慢，但这依然没能解释为什么会经历推理耗时正常-线性减速-耗时稳定的现象&lt;/li>
+&lt;li>所以只在这种程度上分析还是有所不足，如果能在本地采用 Nsight Compute 或许能有进一步了解&lt;/li>
+&lt;/ul></description></item><item><title>Caffe使用问题记录</title><link>/p/caffe%E4%BD%BF%E7%94%A8%E9%97%AE%E9%A2%98%E8%AE%B0%E5%BD%95/</link><pubDate>Tue, 07 Aug 2018 00:00:00 +0000</pubDate><guid>/p/caffe%E4%BD%BF%E7%94%A8%E9%97%AE%E9%A2%98%E8%AE%B0%E5%BD%95/</guid><description>&lt;p>以往在使用 caffe 中遇到的部分问题记录。&lt;/p>
+&lt;h2 id="使用教程">使用教程&lt;/h2>
+&lt;p>Caffe 一般通过编译生成的可执行文件 caffe（一般路径为 &lt;code>$CAFFE_PATH/build/tools/caffe&lt;/code>）来进行网络训练和测试。&lt;/p>
+&lt;h3 id="tldr">TL;DR&lt;/h3>
+&lt;ol>
+&lt;li>Python 调用（pycaffe 路径 &lt;code>caffe/python/caffe&lt;/code>）&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl"> &lt;span class="kn">import&lt;/span> &lt;span class="nn">caffe&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">net&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">Net&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">prototxt&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">caffemodel&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">TEST&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="c1"># 设置网络&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;对应层的name&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="o">...&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="nb">input&lt;/span> &lt;span class="c1"># 操作输入输出&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">pred&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">foward&lt;/span>&lt;span class="p">()&lt;/span> &lt;span class="c1"># 前向取出最终层结果, 也可以通过 pred = net.blobs[&amp;#39;name&amp;#39;].data 来拿到&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;ol start="2">
+&lt;li>C++ 前向追踪：&lt;br>
+&lt;code>net.cpp::Forward -&amp;gt; layer.hpp::Forward -&amp;gt; 各layer的Forward (src/caffe/layers/*.cpp &amp;amp; *.cu)&lt;/code>&lt;/li>
+&lt;/ol>
+&lt;p>自定义修改：&lt;/p>
+&lt;ol>
+&lt;li>自定义网络结构 ( 根据 &lt;code>caffe.proto&lt;/code> ):
+&lt;ul>
+&lt;li>改 &lt;code>train.prototxt&lt;/code>、&lt;code>solver.prototxt&lt;/code>、&lt;code>test.prototxt&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>自定义层:
+&lt;ul>
+&lt;li>在 &lt;code>src/caffe/layers/*&lt;/code> 下新增 .cpp、.cu&lt;/li>
+&lt;li>在 &lt;code>include/caffe/layers*&lt;/code> 下新增 .hpp&lt;/li>
+&lt;li>改 &lt;code>caffe.proto&lt;/code>，增加参数条目&lt;/li>
+&lt;li>部分复杂的子函数实现会放在 &lt;code>src/caffe/util&lt;/code> 内&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h3 id="训练所需文件">训练所需文件&lt;/h3>
+&lt;ul>
+&lt;li>&lt;code>*.prototxt&lt;/code>：用于定义网络结构的文件，一般在网络本身的基础上加入了训练和测试过程所需的网络模块，以及模块相应的训练和测试用参数。&lt;/li>
+&lt;li>&lt;code>*_deploy.prototxt&lt;/code>：同样是定义网络结构的文件，但只包含了前向推理部分，没有训练部分的模块和参数。&lt;/li>
+&lt;li>&lt;code>*_solver.prototxt&lt;/code>：用于训练和测试的配置文件，类似学习率、学习策略、惩罚项和输出信息等，可在 &lt;code>$CAFFE_PATH/src/caffe/proto/caffe.proto&lt;/code> 中的 &lt;code>SolverParameter&lt;/code> 找到具体配置项信息。&lt;/li>
+&lt;/ul>
+&lt;p>上述文件的名字可随意更改，不过一般会加上这些后缀用以区分。&lt;/p>
+&lt;h3 id="路径相关">路径相关&lt;/h3>
+&lt;p>训练时需要指定 &lt;code>*_solver.prototxt&lt;/code> 的路径，并在 &lt;code>*_solver.prototxt&lt;/code> 指明网络 &lt;code>*.prototxt&lt;/code> 的路径（也可以分开指定训练和测试用的网络），还需要定义输出模型以及状态的路径前缀 &lt;code>snapshot_prefix&lt;/code>。&lt;br>
+一般 &lt;code>*.prototxt&lt;/code> 里还需要在输入数据层指明输入数据集的路径。&lt;/p>
+&lt;h3 id="指令相关">指令相关&lt;/h3>
+&lt;p>训练：（可以加上预训练模型 &lt;code>-weights /路径/*.caffemodel&lt;/code> 或 恢复训练状态 &lt;code>-snapshot /路径/*.solverstate&lt;/code>，&lt;code>*.solverstate&lt;/code> 是在 &lt;code>*.caffemodel&lt;/code> 基础上加上了训练的状态信息）&lt;/p>
+&lt;pre>&lt;code>$CAFFE_PATH/build/tools/caffe train -solver *_solver.prototxt
+&lt;/code>&lt;/pre>
+&lt;p>测试：（需要指定训练测试用的网络和训练好的模型，测试的样本数为 TEST_PHASE 的 &lt;code>batch_size&lt;/code> x &lt;code>iterations&lt;/code>）&lt;/p>
+&lt;pre>&lt;code>$CAFFE_PATH/build/tools/caffe test -model *.prototxt -weights *.caffemodel -iterations 100 -gpu 0
+&lt;/code>&lt;/pre>
+&lt;p>前向：用 python 接口调用 caffe 完成，基本流程形如&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">caffe&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">Net&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">prototxt_path&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">weights_path&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">TEST&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;data&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="o">...&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">input_image&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">forward&lt;/span>&lt;span class="p">()&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">label&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;label&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="caffe-网络相关">Caffe 网络相关&lt;/h3>
+&lt;p>Caffe 的网络 &lt;code>Net&lt;/code> 是由各种层 &lt;code>Layer&lt;/code> 组成的有向无环图，网络层通过 &lt;code>Blob&lt;/code> 来存储 feature maps，具体层的实现在 &lt;code>$CAFFE_PATH/src/caffe/layers/&lt;/code> 和 &lt;code>$CAFFE_PATH/include/caffe/layers/&lt;/code> 里，其传递参数定义于 &lt;code>$CAFFE_PATH/src/caffe/proto/caffe.proto&lt;/code>。网络结构文件中有什么看不懂或者需要深入了解的，找这三个地方就对了。&lt;/p>
+&lt;p>训练网络一般包含训练过程所需要的所有部分，比如数据输入层（如 Data Layer），Loss 层（如 SoftmaxWithLoss Layer），定义好后 Caffe 会自己输入数据然后计算输出 loss 并更新参数。前向网络同理。&lt;/p>
+&lt;p>如果需要用到 Caffe 没有的自定义网络层，需要自己编写相应 C++/CUDA 代码，放置于上述两个文件夹中，如果有传入参数还需要在 &lt;code>caffe.proto&lt;/code> 中添加相应需要传入的参数配置。对于不好实现而且不需要 gpu 加速的自定义层，可以通过 python layer 来实现。&lt;/p>
+&lt;p>对于有复杂操作的网络，比如 loss 需要在外部计算，则可以通过 Caffe 的 python 接口实现，在 python 环境中做训练更新。&lt;/p>
+&lt;h3 id="关于分割网络的训练说明">关于分割网络的训练说明&lt;/h3>
+&lt;p>数据输入层 &lt;code>DenseImageData&lt;/code> 是自定义层，在 &lt;code>dense_image_data_param&lt;/code> 的 &lt;code>source&lt;/code> 中指明了输入图片集的路径，txt 文件内的格式是：&lt;br>
+&amp;ldquo;样本图路径 标签路径&amp;rdquo;&lt;/p>
+&lt;p>标签与样本图同等大小（224x224），单通道，其中像素值 0 为前景，1 为背景。&lt;/p>
+&lt;p>loss_s8、loss 的 class_weighting 为对应标签的 loss 权重，用于解决样本不平衡。class_weighting 计算方法：对所有数据集标签统计各类别个数，比如 0 的个数，1 的个数。&lt;code>class_weighting_0 = num(1)/(num(1)+num(0))&lt;/code>、&lt;code>class_weighting_1 = num(0)/(num(1)+num(0))&lt;/code>。&lt;/p>
+&lt;h2 id="缺陷记录">缺陷记录&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>Xavier&lt;/code>初始化没有乘上增益 (ReLU应乘根号2, 等等)&lt;/li>
+&lt;li>在matlab上训练得出的模型是col-major,需要将所有矩阵参数转置才能在其他地方用&lt;/li>
+&lt;li>老版本caffe在初次前向时会比较慢, 新版未知&lt;/li>
+&lt;li>caffe 初始化数据层时启动线程是 &lt;strong>TEST&lt;/strong> 和 &lt;strong>TRAIN&lt;/strong> 并行进行的, 即使将&lt;code>test_initialization&lt;/code>设置为&lt;code>false&lt;/code>也会进行一次__TEST__的数据 prefetch, 同样会进行&lt;code>Transform&lt;/code>, 所以要注意相关的共享变量.&lt;/li>
+&lt;li>BatchNorm 的 eps 默认为 1e-5, 这个数值是 切实 会对结果产生一定影响的, 在 absorb 参数时也要注意&lt;/li>
+&lt;/ul>
+&lt;h2 id="过程记录">过程记录&lt;/h2>
+&lt;ul>
+&lt;li>后向根据&lt;code>top_diff&lt;/code>和前向结果算出各&lt;code>blob&lt;/code>参数的&lt;code>diff&lt;/code>, 以及&lt;code>bottom&lt;/code>的&lt;code>diff&lt;/code>, 所以分别对&lt;code>blob&lt;/code>和&lt;code>bottom&lt;/code>求导&lt;/li>
+&lt;li>传播时记得不同微分层乘上前面的梯度值&lt;code>top_diff&lt;/code>,后传多个梯度值的话全部加起来&lt;/li>
+&lt;li>&lt;code>setup&lt;/code>是在加载网络时调用的, 加载完后不再调用&lt;/li>
+&lt;/ul>
+&lt;h2 id="错误记录">错误记录&lt;/h2>
+&lt;ol>
+&lt;li>Check failed: data_&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>为 &lt;code>blob shape&lt;/code> 错误, 一般是 &lt;code>reshape&lt;/code> 函数出错, 也可能是网络设计错误导致 &lt;code>shape&lt;/code> 传过来时负值错误&lt;/li>
+&lt;/ul>
+&lt;h2 id="问题记录">问题记录&lt;/h2>
+&lt;ol>
+&lt;li>caffe模型测试时&lt;code>batch_norm&lt;/code>层的use_global_stats设为false居然没影响???? 错觉&lt;/li>
+&lt;li>训练过程开始良好, 中途出现后方部分卷积开始死亡(参数值非常低), 然后向前传染, 大部分卷积死亡, 表现为验证集上非常不稳定
+&lt;ul>
+&lt;li>推测是ReLU死亡&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>caffe 和 opencv 一起 import 会出错
+&lt;ul>
+&lt;li>added &lt;code>-Wl,-Bstatic -lprotobuf -Wl,-Bdynamic&lt;/code> to &lt;code>LDFLAGS&lt;/code> and removed &lt;code>protobuf&lt;/code> from &lt;code>LIBRARIES&lt;/code> ( 参照 &lt;a class="link" href="https://github.com/BVLC/caffe/issues/1917" target="_blank" rel="noopener"
+>https://github.com/BVLC/caffe/issues/1917&lt;/a> )&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h2 id="犯2记录">犯2记录&lt;/h2>
+&lt;ol>
+&lt;li>&lt;code>resize&lt;/code>层或者叫&lt;code>upsample&lt;/code> &lt;code>upscale&lt;/code> 层, 若训练时使用的缩放算法不同, 在卷积到比较小的时候(4x4)之类的, 会由于策略差异导致缩放前后误差非差大&lt;/li>
+&lt;li>test 或 upgrade 时 model 和 prototxt 写反&lt;/li>
+&lt;/ol>
+&lt;blockquote>
+&lt;p>[libprotobuf ERROR google/protobuf/text_format.cc:274] Error parsing text-format caffe.NetParameter: 2:1: Invalid control characters encountered in text.&lt;br>
+&amp;hellip;..&lt;br>
+*** Check failure stack trace: ***&lt;br>
+已放弃 (核心已转储)&lt;/p>
+&lt;/blockquote>
+&lt;ol start="3">
+&lt;li>二分类问题 SoftmaxWithLoss 层不要设 ignore_label, ignore_label 是会忽略该 label 的 loss 和 diff 传递, 导致结果会完全倒向另一个 label , 因为 SoftmaxWithLoss 是计算准确率来算 loss 的&lt;/li>
+&lt;/ol>
+&lt;h2 id="常见安装问题">常见安装问题&lt;/h2>
+&lt;ol>
+&lt;li>
+&lt;p>一般常见 protobuf 问题, 因为 Tensorflow 也用 protobuf, 不仅用, 还会自动升级 protobuf, 而 caffe 不怎么支持新版本的 protobuf, 所以如果配置了其他开源库的开发环境之后 caffe 报错了, 基本可以从几个方面检查 protobuf 有没问题.&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>pip list&lt;/code>, 查看 protobuf 版本, 一般 2.6.1 比较通用, 如果是 3.5 那就换吧. 如果同时使用了 python2.7 和 python 3.5 的话那还要注意 pip 也分 pip2 和 pip3, 安装的库也分别独立. 可以在 &lt;code>/usr/bin&lt;/code>, &lt;code>/usr/local/bin&lt;/code>, &lt;code>/$HOME/.local/bin&lt;/code> 下找到 pip 脚本, 打开就能看到它用的是 python2.7 还是 python3.5. ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>protoc --version&lt;/code>, protobuf 依赖的东西, 查看它的版本和 protobuf 的是否一样, 不一样的话可以通过下载相应版本 release, 或者从源码安装 protobuf. 然后在 &lt;code>/etc/ld.so.conf&lt;/code> 里面添加上一行 &lt;code>/usr/local/lib&lt;/code>, 然后 &lt;code>sudo ldconfig&lt;/code> 更新下链接库就行了. ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>apt list | grep &amp;quot;protobuf&amp;quot;&lt;/code>, 有时候会有用 &lt;code>apt-get install&lt;/code> 和 &lt;code>pip install&lt;/code> 装了两种不同版本的 protobuf 的情况, 这时候可以 &lt;code>apt&lt;/code> 删除并重新安装 protobuf ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>File already exists in database: caffe.proto &lt;/code>, 库链接问题或者版本问题 ( 2.6.1 不好用 ), &lt;code>pip uninstall protobuf&lt;/code> 删掉 protobuf, 重启, 加 -fPIC 到 configure, 然后 &lt;code>./configure --disable-shared&lt;/code>, 然后在 protobuf 3.3 版本下 &lt;code>cd $PROTOBUF_BUILD_DIR/python&lt;/code>, &lt;code>python setup.py build&lt;/code>, &lt;code>python setup.py test&lt;/code>, &lt;code>python setup.py install&lt;/code> ( &lt;em>然而出现了下一个问题&lt;/em> )
+&lt;ul>
+&lt;li>还可能是 caffe 玄学问题, 总之最简单的就是直接把能用的 caffe 替换过来&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;code>make all&lt;/code> 时出现一堆 protobuf 未定义的引用问题. ( &lt;em>未解, 回溯 2.6.1&lt;/em> )&lt;/li>
+&lt;li>2.6.1:
+&lt;ul>
+&lt;li>
+&lt;p>&lt;code>caffe_pb2.py: syntax error&lt;/code>, 注释掉默认 caffe 的 &lt;code>python/caffe/proto/caffe_pb2.py&lt;/code>, 至于为什么项目 caffe 没有用自己的 &lt;code>caffe_pb2.py&lt;/code> 而用到默认 caffe, 是因为没有成功 &lt;code>make pycaffe&lt;/code> ??? 总之应该是版本问题.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>File already exists in database: caffe.proto&lt;/code> 依旧存在这个问题, 在 &lt;code>import caffe&lt;/code> 后 &lt;code>import cv2&lt;/code> 会发生, 还是需要静态链接 protobuf, 这样可以解决:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;blockquote>
+&lt;p>linking caffe against libprotobuf.a instead of libprotobuf.so could solve this issue&lt;/p>
+&lt;/blockquote>
+&lt;/li>
+&lt;li>
+&lt;blockquote>
+&lt;p>I changed caffe&amp;rsquo;s Makefile. Specifically, I added -Wl,-Bstatic -lprotobuf -Wl,-Bdynamic to LDFLAGS and removed protobuf from LIBRARIES.
+I have uploaded my Makefile to gist (&lt;a class="link" href="https://gist.github.com/tianzhi0549/773c8dbc383c0cb80e7b%29" target="_blank" rel="noopener"
+>https://gist.github.com/tianzhi0549/773c8dbc383c0cb80e7b)&lt;/a>. You could check it out to see what changes I made (Line 172 and 369).&lt;/p>
+&lt;/blockquote>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>File &amp;quot;/usr/lib/python2.7/dist-packages/caffe/pycaffe.py&amp;quot;, line 13, in &amp;lt;module&amp;gt; from ._caffe import Net, SGDSolver, NesterovSolver, AdaGradSolver, libcaffe.so.1.0.0: cannot open shared object file: No such file or directory&lt;/code>. 这是 python 又喵了咪了用了默认 release 版 caffe, 删掉 &lt;code>/usr/lib/python2.7/dist-packages/caffe&lt;/code>, 然后在工程头处 &lt;code>import sys&lt;/code> 加&lt;code>sys.path.insert('/home/sad/ENet/caffe-enet/python')&lt;/code> 和 &lt;code>sys.path.insert('/home/sad/ENet/caffe-enet/python/caffe')&lt;/code> 再 &lt;code>import caffe &lt;/code>, 问题终于解决!&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>libcudnn.so.5: cannot open shared object file: No such file or directory&lt;/code>, ld 抽风, 需要专门刷新下 cuda 链接路径 :&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">sudo ldconfig /usr/local/cuda-8.0/lib64
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;ol start="3">
+&lt;li>&lt;code>*** SIGSEGV (@0x100000049) received by PID 703 (TID 0x7f52cbb1c9c0) from PID 73; stack trace: ***&lt;/code> 或者 &lt;code>Segmentation fault (core dumped)&lt;/code>, 可能是 python 层的使用出了问题&lt;/li>
+&lt;li>段错误, &lt;code>import caffe&lt;/code> 退出后错误, 有可能是用了 opencv contrib 的 &lt;code>LIBRARY&lt;/code>, 在 &lt;code>Makefile&lt;/code> 里删掉 &lt;code>opencv_videoc&lt;/code> 什么的&amp;hellip;&lt;/li>
+&lt;/ol>
+&lt;h2 id="推荐安装方法">推荐安装方法&lt;/h2>
+&lt;p>使用 CMake 来安装，推荐 ubuntu16.04 + gcc5.4 + python2.7 + CUDA8.0 + opencv3.4 + protobuf2.6&lt;/p>
+&lt;p>实测 Ubuntu18.04 + gcc7 + python2.7 + CUDA10.2 + opencv3.4 + protobuf 3.11? 可以运行，但不支持 cudnn7.6.5。CUDA10.0 + cudnn7.3.1可以正常运作。&lt;/p></description></item><item><title>零核现象</title><link>/p/%E9%9B%B6%E6%A0%B8%E7%8E%B0%E8%B1%A1/</link><pubDate>Thu, 19 Apr 2018 00:00:00 +0000</pubDate><guid>/p/%E9%9B%B6%E6%A0%B8%E7%8E%B0%E8%B1%A1/</guid><description>&lt;div align=center>
+&lt;img src="TingMengDe.bmp">
+&lt;/div>
+这里是对零核现象的观察实验记录.
+具体来说, 就是在训练卷积神经网络的过程中发现模型中有大量卷积核的 L1 变为 0 的情况, 这里为了方便简称零核现象.
+&lt;p>最初遇到这种问题是在 &lt;a class="link" href="https://github.com/MarekKowalski/DeepAlignmentNetwork" target="_blank" rel="noopener"
+>DAN&lt;/a> 训练时发现的, 当时觉得是太大学习率, ReLU 死亡, 后面降低了 lr 就没出现过了.&lt;br>
+直到后来做分割观察 &lt;a class="link" href="https://github.com/TimoSaemann/ENet" target="_blank" rel="noopener"
+>ENet&lt;/a> 的预训练模型时又发现了几百个零核的现象, 而且自己用 ShuffleNet 做的分割网络也出现了非常多零核, 这对模型性能显然是有很大影响的, 所以就下定决心解决这个问题.&lt;br>
+根据之前 DAN 的经验, 我自然先试了一下降低学习率, 结果没用, 虽然零增长的速度变慢了, 但还是会出现, 而且随着训练过程零核几乎线性增加 ( 像上图那样 ).&lt;br>
+把每层的零核数作纵坐标, 层数作横坐标, 打印成曲线出来就是这个样子:&lt;/p>
+&lt;div align=center>
+&lt;img src="coco_train.png">
+一共 2312 个零核, 简直壮观.
+&lt;/div>
+&lt;br />
+&lt;p>因为零核多集中在 depthwise 卷积上, 所以感觉上可能是由于 depthwise 卷积核太薄, 容易训练时掉坑回不来. 后面在网上也没找到多少关于这个的讨论, 唯一一个是在知乎上 &lt;a class="link" href="https://www.zhihu.com/question/265709710/answer/298245276" target="_blank" rel="noopener"
+>关于 MobileNet V2 的回答&lt;/a>, 也是差不多的解释, 不过我后来去掉了后面所有的 ReLU, 也是得到了很多空核, 也是个迷.&lt;br>
+无奈之下开始各种调超参. 一是把 batch size 加大, 讲道理更新得会稳一些, 然而并没有用, 零核依然会出现. 二是换了优化器, 用回朴素的 SGD momentum. 这时神奇的事情发生了, 不管怎么训练, 怎么调大 lr, 调小 batch size, 零核都没有出现了&amp;hellip;&lt;/p>
+&lt;div align=center>
+&lt;img src="adam.png">
+Adam
+&lt;img src="sgd.png">
+SGD
+&lt;/div>
+最终对比了几个数据集, 从结果上来看 SGD 版比 Adam 版泛化性更强, 性能在个别数据集上也提升很大, 测试指标的标准差更是明显低于 Adam 版的, 做分割出来的边界也变得更加平滑了. 毕竟 Adam 版零核集聚在高层次上, 泛化方面有所缺陷的也是正常的.
+&lt;h3 id="后续">后续&lt;/h3>
+&lt;p>后面有空在 mnist 上做了些实验, 发现优化器中只有 Adam 和 RMSProp 肯定会产生零核, 而用其他 SGD, AdaDelta, AdaGrad 都不会产生零核. 既然如此的话, 似乎是可以从 RMSProp 中找到启示的, 但如果要验证还是得具体分析下更新过程才行, 只能暂时留坑了.&lt;/p>
+&lt;h3 id="接续">接续&lt;/h3>
+&lt;p>好吧, 上一次记录的结果是错误的, 并非只有 Adam 和 RMSProp 肯定会产生零核, 理论上零核的产生依旧是和参数更新的速率密不可分, 所以所有优化方法都可能产生零核. 之所以之前产生错误的结论, 是因为统计零核时采用了 L1 + 阈值 的方法, 而实际上零核表现出来的是并未完全收敛于 0, L1 差均值 10 倍以内, 但相较于其他滤波器而言判别力非常低的情况. 比如下面这种.&lt;br>
+下面是用 AdaGrad 优化一个普通卷积接 depthwise 卷积重复三次的简单网络, 数据集用的 fashion-mnist, 图为其中两层相邻卷积的可视化, 红橙黄绿蓝靛紫, 代表卷积核的绝对值大小, 左边为普通卷积沿通道绝对值叠加得来, 右边为 depthwise 卷积取绝对值得来.&lt;/p>
+&lt;div align=center>
+&lt;img src="bad.png">
+&lt;/div>
+其后两层
+&lt;div align=center>
+&lt;img src="bad2.png">
+&lt;/div>
+可以看到, 部分卷积核已经几乎一片红了, 对其上层卷积核也产生了影响. 相比之下, SGD 训练的好的情况:
+&lt;div align=center>
+&lt;img src="good.png">
+&lt;/div>
+虽然还无法解明什么, 但至少说明了 depthwise 卷积不太好训练, 通过观察训练过程卷积核的变化, 可以看到 SGD + momentum 相对还是比较平稳的, 尽管有些时候可能也会漏网 ( 实际上之前用 MobileNetV2 做分割在 COCO 上预训练也有出现十几个零核... ). 先到这里, 之后一年的时间因为要专心学习, 所以大概要全面搁置了, 可能会整理记录下之前的项目. 就等之后爬上好的平台再说吧.</description></item></channel></rss>

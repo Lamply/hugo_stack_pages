@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Caffe on 次二小栈</title><link>/tags/caffe/</link><description>Recent content in Caffe on 次二小栈</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><lastBuildDate>Tue, 07 Aug 2018 00:00:00 +0000</lastBuildDate><atom:link href="/tags/caffe/index.xml" rel="self" type="application/rss+xml"/><item><title>Caffe使用问题记录</title><link>/p/caffe%E4%BD%BF%E7%94%A8%E9%97%AE%E9%A2%98%E8%AE%B0%E5%BD%95/</link><pubDate>Tue, 07 Aug 2018 00:00:00 +0000</pubDate><guid>/p/caffe%E4%BD%BF%E7%94%A8%E9%97%AE%E9%A2%98%E8%AE%B0%E5%BD%95/</guid><description>&lt;p>以往在使用 caffe 中遇到的部分问题记录。&lt;/p>
+&lt;h2 id="使用教程">使用教程&lt;/h2>
+&lt;p>Caffe 一般通过编译生成的可执行文件 caffe（一般路径为 &lt;code>$CAFFE_PATH/build/tools/caffe&lt;/code>）来进行网络训练和测试。&lt;/p>
+&lt;h3 id="tldr">TL;DR&lt;/h3>
+&lt;ol>
+&lt;li>Python 调用（pycaffe 路径 &lt;code>caffe/python/caffe&lt;/code>）&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl"> &lt;span class="kn">import&lt;/span> &lt;span class="nn">caffe&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">net&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">Net&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">prototxt&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">caffemodel&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">TEST&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="c1"># 设置网络&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;对应层的name&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="o">...&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="nb">input&lt;/span> &lt;span class="c1"># 操作输入输出&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">pred&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">foward&lt;/span>&lt;span class="p">()&lt;/span> &lt;span class="c1"># 前向取出最终层结果, 也可以通过 pred = net.blobs[&amp;#39;name&amp;#39;].data 来拿到&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;ol start="2">
+&lt;li>C++ 前向追踪：&lt;br>
+&lt;code>net.cpp::Forward -&amp;gt; layer.hpp::Forward -&amp;gt; 各layer的Forward (src/caffe/layers/*.cpp &amp;amp; *.cu)&lt;/code>&lt;/li>
+&lt;/ol>
+&lt;p>自定义修改：&lt;/p>
+&lt;ol>
+&lt;li>自定义网络结构 ( 根据 &lt;code>caffe.proto&lt;/code> ):
+&lt;ul>
+&lt;li>改 &lt;code>train.prototxt&lt;/code>、&lt;code>solver.prototxt&lt;/code>、&lt;code>test.prototxt&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>自定义层:
+&lt;ul>
+&lt;li>在 &lt;code>src/caffe/layers/*&lt;/code> 下新增 .cpp、.cu&lt;/li>
+&lt;li>在 &lt;code>include/caffe/layers*&lt;/code> 下新增 .hpp&lt;/li>
+&lt;li>改 &lt;code>caffe.proto&lt;/code>，增加参数条目&lt;/li>
+&lt;li>部分复杂的子函数实现会放在 &lt;code>src/caffe/util&lt;/code> 内&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h3 id="训练所需文件">训练所需文件&lt;/h3>
+&lt;ul>
+&lt;li>&lt;code>*.prototxt&lt;/code>：用于定义网络结构的文件，一般在网络本身的基础上加入了训练和测试过程所需的网络模块，以及模块相应的训练和测试用参数。&lt;/li>
+&lt;li>&lt;code>*_deploy.prototxt&lt;/code>：同样是定义网络结构的文件，但只包含了前向推理部分，没有训练部分的模块和参数。&lt;/li>
+&lt;li>&lt;code>*_solver.prototxt&lt;/code>：用于训练和测试的配置文件，类似学习率、学习策略、惩罚项和输出信息等，可在 &lt;code>$CAFFE_PATH/src/caffe/proto/caffe.proto&lt;/code> 中的 &lt;code>SolverParameter&lt;/code> 找到具体配置项信息。&lt;/li>
+&lt;/ul>
+&lt;p>上述文件的名字可随意更改，不过一般会加上这些后缀用以区分。&lt;/p>
+&lt;h3 id="路径相关">路径相关&lt;/h3>
+&lt;p>训练时需要指定 &lt;code>*_solver.prototxt&lt;/code> 的路径，并在 &lt;code>*_solver.prototxt&lt;/code> 指明网络 &lt;code>*.prototxt&lt;/code> 的路径（也可以分开指定训练和测试用的网络），还需要定义输出模型以及状态的路径前缀 &lt;code>snapshot_prefix&lt;/code>。&lt;br>
+一般 &lt;code>*.prototxt&lt;/code> 里还需要在输入数据层指明输入数据集的路径。&lt;/p>
+&lt;h3 id="指令相关">指令相关&lt;/h3>
+&lt;p>训练：（可以加上预训练模型 &lt;code>-weights /路径/*.caffemodel&lt;/code> 或 恢复训练状态 &lt;code>-snapshot /路径/*.solverstate&lt;/code>，&lt;code>*.solverstate&lt;/code> 是在 &lt;code>*.caffemodel&lt;/code> 基础上加上了训练的状态信息）&lt;/p>
+&lt;pre>&lt;code>$CAFFE_PATH/build/tools/caffe train -solver *_solver.prototxt
+&lt;/code>&lt;/pre>
+&lt;p>测试：（需要指定训练测试用的网络和训练好的模型，测试的样本数为 TEST_PHASE 的 &lt;code>batch_size&lt;/code> x &lt;code>iterations&lt;/code>）&lt;/p>
+&lt;pre>&lt;code>$CAFFE_PATH/build/tools/caffe test -model *.prototxt -weights *.caffemodel -iterations 100 -gpu 0
+&lt;/code>&lt;/pre>
+&lt;p>前向：用 python 接口调用 caffe 完成，基本流程形如&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">caffe&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">Net&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">prototxt_path&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">weights_path&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">TEST&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;data&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="o">...&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">input_image&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">forward&lt;/span>&lt;span class="p">()&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">label&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;label&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="caffe-网络相关">Caffe 网络相关&lt;/h3>
+&lt;p>Caffe 的网络 &lt;code>Net&lt;/code> 是由各种层 &lt;code>Layer&lt;/code> 组成的有向无环图，网络层通过 &lt;code>Blob&lt;/code> 来存储 feature maps，具体层的实现在 &lt;code>$CAFFE_PATH/src/caffe/layers/&lt;/code> 和 &lt;code>$CAFFE_PATH/include/caffe/layers/&lt;/code> 里，其传递参数定义于 &lt;code>$CAFFE_PATH/src/caffe/proto/caffe.proto&lt;/code>。网络结构文件中有什么看不懂或者需要深入了解的，找这三个地方就对了。&lt;/p>
+&lt;p>训练网络一般包含训练过程所需要的所有部分，比如数据输入层（如 Data Layer），Loss 层（如 SoftmaxWithLoss Layer），定义好后 Caffe 会自己输入数据然后计算输出 loss 并更新参数。前向网络同理。&lt;/p>
+&lt;p>如果需要用到 Caffe 没有的自定义网络层，需要自己编写相应 C++/CUDA 代码，放置于上述两个文件夹中，如果有传入参数还需要在 &lt;code>caffe.proto&lt;/code> 中添加相应需要传入的参数配置。对于不好实现而且不需要 gpu 加速的自定义层，可以通过 python layer 来实现。&lt;/p>
+&lt;p>对于有复杂操作的网络，比如 loss 需要在外部计算，则可以通过 Caffe 的 python 接口实现，在 python 环境中做训练更新。&lt;/p>
+&lt;h3 id="关于分割网络的训练说明">关于分割网络的训练说明&lt;/h3>
+&lt;p>数据输入层 &lt;code>DenseImageData&lt;/code> 是自定义层，在 &lt;code>dense_image_data_param&lt;/code> 的 &lt;code>source&lt;/code> 中指明了输入图片集的路径，txt 文件内的格式是：&lt;br>
+&amp;ldquo;样本图路径 标签路径&amp;rdquo;&lt;/p>
+&lt;p>标签与样本图同等大小（224x224），单通道，其中像素值 0 为前景，1 为背景。&lt;/p>
+&lt;p>loss_s8、loss 的 class_weighting 为对应标签的 loss 权重，用于解决样本不平衡。class_weighting 计算方法：对所有数据集标签统计各类别个数，比如 0 的个数，1 的个数。&lt;code>class_weighting_0 = num(1)/(num(1)+num(0))&lt;/code>、&lt;code>class_weighting_1 = num(0)/(num(1)+num(0))&lt;/code>。&lt;/p>
+&lt;h2 id="缺陷记录">缺陷记录&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>Xavier&lt;/code>初始化没有乘上增益 (ReLU应乘根号2, 等等)&lt;/li>
+&lt;li>在matlab上训练得出的模型是col-major,需要将所有矩阵参数转置才能在其他地方用&lt;/li>
+&lt;li>老版本caffe在初次前向时会比较慢, 新版未知&lt;/li>
+&lt;li>caffe 初始化数据层时启动线程是 &lt;strong>TEST&lt;/strong> 和 &lt;strong>TRAIN&lt;/strong> 并行进行的, 即使将&lt;code>test_initialization&lt;/code>设置为&lt;code>false&lt;/code>也会进行一次__TEST__的数据 prefetch, 同样会进行&lt;code>Transform&lt;/code>, 所以要注意相关的共享变量.&lt;/li>
+&lt;li>BatchNorm 的 eps 默认为 1e-5, 这个数值是 切实 会对结果产生一定影响的, 在 absorb 参数时也要注意&lt;/li>
+&lt;/ul>
+&lt;h2 id="过程记录">过程记录&lt;/h2>
+&lt;ul>
+&lt;li>后向根据&lt;code>top_diff&lt;/code>和前向结果算出各&lt;code>blob&lt;/code>参数的&lt;code>diff&lt;/code>, 以及&lt;code>bottom&lt;/code>的&lt;code>diff&lt;/code>, 所以分别对&lt;code>blob&lt;/code>和&lt;code>bottom&lt;/code>求导&lt;/li>
+&lt;li>传播时记得不同微分层乘上前面的梯度值&lt;code>top_diff&lt;/code>,后传多个梯度值的话全部加起来&lt;/li>
+&lt;li>&lt;code>setup&lt;/code>是在加载网络时调用的, 加载完后不再调用&lt;/li>
+&lt;/ul>
+&lt;h2 id="错误记录">错误记录&lt;/h2>
+&lt;ol>
+&lt;li>Check failed: data_&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>为 &lt;code>blob shape&lt;/code> 错误, 一般是 &lt;code>reshape&lt;/code> 函数出错, 也可能是网络设计错误导致 &lt;code>shape&lt;/code> 传过来时负值错误&lt;/li>
+&lt;/ul>
+&lt;h2 id="问题记录">问题记录&lt;/h2>
+&lt;ol>
+&lt;li>caffe模型测试时&lt;code>batch_norm&lt;/code>层的use_global_stats设为false居然没影响???? 错觉&lt;/li>
+&lt;li>训练过程开始良好, 中途出现后方部分卷积开始死亡(参数值非常低), 然后向前传染, 大部分卷积死亡, 表现为验证集上非常不稳定
+&lt;ul>
+&lt;li>推测是ReLU死亡&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>caffe 和 opencv 一起 import 会出错
+&lt;ul>
+&lt;li>added &lt;code>-Wl,-Bstatic -lprotobuf -Wl,-Bdynamic&lt;/code> to &lt;code>LDFLAGS&lt;/code> and removed &lt;code>protobuf&lt;/code> from &lt;code>LIBRARIES&lt;/code> ( 参照 &lt;a class="link" href="https://github.com/BVLC/caffe/issues/1917" target="_blank" rel="noopener"
+>https://github.com/BVLC/caffe/issues/1917&lt;/a> )&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h2 id="犯2记录">犯2记录&lt;/h2>
+&lt;ol>
+&lt;li>&lt;code>resize&lt;/code>层或者叫&lt;code>upsample&lt;/code> &lt;code>upscale&lt;/code> 层, 若训练时使用的缩放算法不同, 在卷积到比较小的时候(4x4)之类的, 会由于策略差异导致缩放前后误差非差大&lt;/li>
+&lt;li>test 或 upgrade 时 model 和 prototxt 写反&lt;/li>
+&lt;/ol>
+&lt;blockquote>
+&lt;p>[libprotobuf ERROR google/protobuf/text_format.cc:274] Error parsing text-format caffe.NetParameter: 2:1: Invalid control characters encountered in text.&lt;br>
+&amp;hellip;..&lt;br>
+*** Check failure stack trace: ***&lt;br>
+已放弃 (核心已转储)&lt;/p>
+&lt;/blockquote>
+&lt;ol start="3">
+&lt;li>二分类问题 SoftmaxWithLoss 层不要设 ignore_label, ignore_label 是会忽略该 label 的 loss 和 diff 传递, 导致结果会完全倒向另一个 label , 因为 SoftmaxWithLoss 是计算准确率来算 loss 的&lt;/li>
+&lt;/ol>
+&lt;h2 id="常见安装问题">常见安装问题&lt;/h2>
+&lt;ol>
+&lt;li>
+&lt;p>一般常见 protobuf 问题, 因为 Tensorflow 也用 protobuf, 不仅用, 还会自动升级 protobuf, 而 caffe 不怎么支持新版本的 protobuf, 所以如果配置了其他开源库的开发环境之后 caffe 报错了, 基本可以从几个方面检查 protobuf 有没问题.&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>pip list&lt;/code>, 查看 protobuf 版本, 一般 2.6.1 比较通用, 如果是 3.5 那就换吧. 如果同时使用了 python2.7 和 python 3.5 的话那还要注意 pip 也分 pip2 和 pip3, 安装的库也分别独立. 可以在 &lt;code>/usr/bin&lt;/code>, &lt;code>/usr/local/bin&lt;/code>, &lt;code>/$HOME/.local/bin&lt;/code> 下找到 pip 脚本, 打开就能看到它用的是 python2.7 还是 python3.5. ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>protoc --version&lt;/code>, protobuf 依赖的东西, 查看它的版本和 protobuf 的是否一样, 不一样的话可以通过下载相应版本 release, 或者从源码安装 protobuf. 然后在 &lt;code>/etc/ld.so.conf&lt;/code> 里面添加上一行 &lt;code>/usr/local/lib&lt;/code>, 然后 &lt;code>sudo ldconfig&lt;/code> 更新下链接库就行了. ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>apt list | grep &amp;quot;protobuf&amp;quot;&lt;/code>, 有时候会有用 &lt;code>apt-get install&lt;/code> 和 &lt;code>pip install&lt;/code> 装了两种不同版本的 protobuf 的情况, 这时候可以 &lt;code>apt&lt;/code> 删除并重新安装 protobuf ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>File already exists in database: caffe.proto &lt;/code>, 库链接问题或者版本问题 ( 2.6.1 不好用 ), &lt;code>pip uninstall protobuf&lt;/code> 删掉 protobuf, 重启, 加 -fPIC 到 configure, 然后 &lt;code>./configure --disable-shared&lt;/code>, 然后在 protobuf 3.3 版本下 &lt;code>cd $PROTOBUF_BUILD_DIR/python&lt;/code>, &lt;code>python setup.py build&lt;/code>, &lt;code>python setup.py test&lt;/code>, &lt;code>python setup.py install&lt;/code> ( &lt;em>然而出现了下一个问题&lt;/em> )
+&lt;ul>
+&lt;li>还可能是 caffe 玄学问题, 总之最简单的就是直接把能用的 caffe 替换过来&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;code>make all&lt;/code> 时出现一堆 protobuf 未定义的引用问题. ( &lt;em>未解, 回溯 2.6.1&lt;/em> )&lt;/li>
+&lt;li>2.6.1:
+&lt;ul>
+&lt;li>
+&lt;p>&lt;code>caffe_pb2.py: syntax error&lt;/code>, 注释掉默认 caffe 的 &lt;code>python/caffe/proto/caffe_pb2.py&lt;/code>, 至于为什么项目 caffe 没有用自己的 &lt;code>caffe_pb2.py&lt;/code> 而用到默认 caffe, 是因为没有成功 &lt;code>make pycaffe&lt;/code> ??? 总之应该是版本问题.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>File already exists in database: caffe.proto&lt;/code> 依旧存在这个问题, 在 &lt;code>import caffe&lt;/code> 后 &lt;code>import cv2&lt;/code> 会发生, 还是需要静态链接 protobuf, 这样可以解决:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;blockquote>
+&lt;p>linking caffe against libprotobuf.a instead of libprotobuf.so could solve this issue&lt;/p>
+&lt;/blockquote>
+&lt;/li>
+&lt;li>
+&lt;blockquote>
+&lt;p>I changed caffe&amp;rsquo;s Makefile. Specifically, I added -Wl,-Bstatic -lprotobuf -Wl,-Bdynamic to LDFLAGS and removed protobuf from LIBRARIES.
+I have uploaded my Makefile to gist (&lt;a class="link" href="https://gist.github.com/tianzhi0549/773c8dbc383c0cb80e7b%29" target="_blank" rel="noopener"
+>https://gist.github.com/tianzhi0549/773c8dbc383c0cb80e7b)&lt;/a>. You could check it out to see what changes I made (Line 172 and 369).&lt;/p>
+&lt;/blockquote>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>File &amp;quot;/usr/lib/python2.7/dist-packages/caffe/pycaffe.py&amp;quot;, line 13, in &amp;lt;module&amp;gt; from ._caffe import Net, SGDSolver, NesterovSolver, AdaGradSolver, libcaffe.so.1.0.0: cannot open shared object file: No such file or directory&lt;/code>. 这是 python 又喵了咪了用了默认 release 版 caffe, 删掉 &lt;code>/usr/lib/python2.7/dist-packages/caffe&lt;/code>, 然后在工程头处 &lt;code>import sys&lt;/code> 加&lt;code>sys.path.insert('/home/sad/ENet/caffe-enet/python')&lt;/code> 和 &lt;code>sys.path.insert('/home/sad/ENet/caffe-enet/python/caffe')&lt;/code> 再 &lt;code>import caffe &lt;/code>, 问题终于解决!&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>libcudnn.so.5: cannot open shared object file: No such file or directory&lt;/code>, ld 抽风, 需要专门刷新下 cuda 链接路径 :&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">sudo ldconfig /usr/local/cuda-8.0/lib64
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;ol start="3">
+&lt;li>&lt;code>*** SIGSEGV (@0x100000049) received by PID 703 (TID 0x7f52cbb1c9c0) from PID 73; stack trace: ***&lt;/code> 或者 &lt;code>Segmentation fault (core dumped)&lt;/code>, 可能是 python 层的使用出了问题&lt;/li>
+&lt;li>段错误, &lt;code>import caffe&lt;/code> 退出后错误, 有可能是用了 opencv contrib 的 &lt;code>LIBRARY&lt;/code>, 在 &lt;code>Makefile&lt;/code> 里删掉 &lt;code>opencv_videoc&lt;/code> 什么的&amp;hellip;&lt;/li>
+&lt;/ol>
+&lt;h2 id="推荐安装方法">推荐安装方法&lt;/h2>
+&lt;p>使用 CMake 来安装，推荐 ubuntu16.04 + gcc5.4 + python2.7 + CUDA8.0 + opencv3.4 + protobuf2.6&lt;/p>
+&lt;p>实测 Ubuntu18.04 + gcc7 + python2.7 + CUDA10.2 + opencv3.4 + protobuf 3.11? 可以运行，但不支持 cudnn7.6.5。CUDA10.0 + cudnn7.3.1可以正常运作。&lt;/p></description></item></channel></rss>

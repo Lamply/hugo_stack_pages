@@ -1,0 +1,901 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>技术经验 on 次二小栈</title><link>/categories/%E6%8A%80%E6%9C%AF%E7%BB%8F%E9%AA%8C/</link><description>Recent content in 技术经验 on 次二小栈</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><lastBuildDate>Fri, 15 Sep 2023 00:00:00 +0000</lastBuildDate><atom:link href="/categories/%E6%8A%80%E6%9C%AF%E7%BB%8F%E9%AA%8C/index.xml" rel="self" type="application/rss+xml"/><item><title>GFPGAN尝试</title><link>/p/gfpgan%E5%B0%9D%E8%AF%95/</link><pubDate>Fri, 15 Sep 2023 00:00:00 +0000</pubDate><guid>/p/gfpgan%E5%B0%9D%E8%AF%95/</guid><description>&lt;img src="/p/gfpgan%E5%B0%9D%E8%AF%95/GFPGAN1.webp" alt="Featured image of post GFPGAN尝试" />&lt;p>links: &lt;a class="link" href="https://github.com/TencentARC/GFPGAN" target="_blank" rel="noopener"
+>https://github.com/TencentARC/GFPGAN&lt;/a>&lt;/p>
+&lt;p>一种人脸高清化的方法，在 stable-diffusion 中被广泛作为插件使用。&lt;/p>
+&lt;p>GFPGAN 人脸裁剪是 FFHQ，人脸和背景分开来放大，背景使用 RealESRGAN， &lt;strong>调查 v1.4 clean 版本&lt;/strong> 。&lt;/p>
+&lt;p>架构上采用 resblock 做下采样得出 stylecode，然后 StyleGAN2 上采样恢复。在每层卷积之间对一半通道使用 SFT (Spatial Feature Transform)，别的好像没什么特别的 。&lt;/p>
+&lt;p>&lt;img src="/p/gfpgan%E5%B0%9D%E8%AF%95/gfpgan_network.png"
+width="2060"
+height="792"
+srcset="/p/gfpgan%E5%B0%9D%E8%AF%95/gfpgan_network_hub436fbf6b5882157073b192fcf8672fd_539034_480x0_resize_box_3.png 480w, /p/gfpgan%E5%B0%9D%E8%AF%95/gfpgan_network_hub436fbf6b5882157073b192fcf8672fd_539034_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+alt="gfpgan_network"
+class="gallery-image"
+data-flex-grow="260"
+data-flex-basis="624px"
+>&lt;/p>
+&lt;p>SFT 是由 stylecode 上采样时每一级都会嵌入的变换，每层变换参数由 resblock 下采样层+上采样层得出。理论上是利用一组共享的语义概率特征（condition）给图像做分类来提供超分辨率细节，但实际实现似乎并不是共享，而是直接 encode-decode 多级输出，每层都会用一个新的上采样层解码再生成新的 condition。&lt;/p>
+&lt;p>换而言之就是共享 encoder，然后分两个 decoder，一个组成类似 UNet 生成多分辨率特征输出，另一个是 stylegan2，把多分辨率特征按照对半通道 SFT 的方式进行生成。&lt;/p>
+&lt;h2 id="尝试">尝试&lt;/h2>
+&lt;p>减少 condition 嵌入数量可以看到各种边缘越来越简单。&lt;/p>
+&lt;p>类 UNet 能生成多级 RGB 输出，看起来每层各司其职（最后一层负责色彩，前面各层对应各层细节），看来是不用缩小图做监督的好处。&lt;/p>
+&lt;p>也说明总体结构和色彩是由类 UNet 提供，而非 StyleGAN。&lt;/p>
+&lt;p>直接采用高斯分布的随机数作为 latent 输入到 StyleGAN 中，也可以得到合理的结果，虽然细节差很多：&lt;/p>
+&lt;p>&lt;img src="/p/gfpgan%E5%B0%9D%E8%AF%95/GFPGAN1.webp"
+width="928"
+height="307"
+srcset="/p/gfpgan%E5%B0%9D%E8%AF%95/GFPGAN1_hua19e7be9ff06dc72a46a8fa9c415a192_43292_480x0_resize_q75_h2_box_2.webp 480w, /p/gfpgan%E5%B0%9D%E8%AF%95/GFPGAN1_hua19e7be9ff06dc72a46a8fa9c415a192_43292_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="左：原图，中：GFPGAN 原始实现，右：随机 latent GFPGAN"
+class="gallery-image"
+data-flex-grow="302"
+data-flex-basis="725px"
+>&lt;/p>
+&lt;p>说明 StyleGAN 在 GFPGAN 中作用非常小，主要负责超分里的细节。而类 UNet 的特征不太好整合，可能难以用于其他任务的特征提取。&lt;/p>
+&lt;h2 id="总结">总结&lt;/h2>
+&lt;p>效果很好，尝试了几个退化图片都非常好，缺点是真得有点假的皮肤，以及高度依赖类 UNet 跳跃链接导致不好做特征提取。&lt;/p></description></item><item><title>如何处理含nan值的光流图像</title><link>/p/%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%90%ABnan%E5%80%BC%E7%9A%84%E5%85%89%E6%B5%81%E5%9B%BE%E5%83%8F/</link><pubDate>Thu, 06 Apr 2023 00:00:00 +0000</pubDate><guid>/p/%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%90%ABnan%E5%80%BC%E7%9A%84%E5%85%89%E6%B5%81%E5%9B%BE%E5%83%8F/</guid><description>&lt;h2 id="迭代更新双线性插值">迭代更新双线性插值&lt;/h2>
+&lt;p>做光流图像时容易出现很多噪点，将重采样后变化较大的部分 mask 掉，就可以得到相对可靠但是有缺失值（nan）的图像：&lt;/p>
+&lt;p>&lt;img src="/p/%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%90%ABnan%E5%80%BC%E7%9A%84%E5%85%89%E6%B5%81%E5%9B%BE%E5%83%8F/flow_nan.webp"
+width="436"
+height="436"
+srcset="/p/%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%90%ABnan%E5%80%BC%E7%9A%84%E5%85%89%E6%B5%81%E5%9B%BE%E5%83%8F/flow_nan_hu6a06e5dfadc6d2543101d293409e61f4_5148_480x0_resize_q75_h2_box_2.webp 480w, /p/%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%90%ABnan%E5%80%BC%E7%9A%84%E5%85%89%E6%B5%81%E5%9B%BE%E5%83%8F/flow_nan_hu6a06e5dfadc6d2543101d293409e61f4_5148_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="100"
+data-flex-basis="240px"
+>&lt;/p>
+&lt;p>突发奇想的一种解决方法就是采集每个以缺失点为中心的 32x32、16x16、8x8、4x4、2x2 的区域（还可以更高）的非 nan 均值，这些均值可以看作一个点的运动（由大范围模糊准确值向小范围精确噪声值运动），再直接取均值就能得到考虑了图像连续性的一个较好的估计。得出结果如下：&lt;/p>
+&lt;p>&lt;img src="/p/%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%90%ABnan%E5%80%BC%E7%9A%84%E5%85%89%E6%B5%81%E5%9B%BE%E5%83%8F/flow_smooth.webp"
+width="443"
+height="443"
+srcset="/p/%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%90%ABnan%E5%80%BC%E7%9A%84%E5%85%89%E6%B5%81%E5%9B%BE%E5%83%8F/flow_smooth_hucf173059288870c4483417775e9940af_1696_480x0_resize_q75_h2_box_2.webp 480w, /p/%E5%A6%82%E4%BD%95%E5%A4%84%E7%90%86%E5%90%ABnan%E5%80%BC%E7%9A%84%E5%85%89%E6%B5%81%E5%9B%BE%E5%83%8F/flow_smooth_hucf173059288870c4483417775e9940af_1696_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="100"
+data-flex-basis="240px"
+>&lt;/p>
+&lt;p>这种方法好处在于比较好实现，可以考虑带掩码的全局滤波器组的实现方法，效果应该也不错。而且还能扩展，比如用其他先验方法来取区域和值来代表，以及点的运动也可以引入先验知识来估计。不知道一般是怎么处理的，反正直接平滑就够用。&lt;/p>
+&lt;p>朴素的实现方法：&lt;/p>
+&lt;script src="https://gist.github.com/Lamply/51880f654b579f371c55392f5110e5b4.js">&lt;/script>
+&lt;p>用 pytorch 向量化一下可以到 3ms 这样&lt;/p>
+&lt;script src="https://gist.github.com/Lamply/0e6f8ca9799ed0515b4cac8bb990603d.js">&lt;/script></description></item><item><title>如何消除图像生成时的棋盘效应</title><link>/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/</link><pubDate>Mon, 24 Oct 2022 00:00:00 +0000</pubDate><guid>/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/</guid><description>&lt;img src="/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/shot.png" alt="Featured image of post 如何消除图像生成时的棋盘效应" />&lt;p>links: [[2022-10-17-Week]], [[2022-10-24-Week]]&lt;/p>
+&lt;p>将 sub-pixel convolution 用作图像生成的输出层时，依然有可能出现棋盘效应。如图是经过 &lt;a class="link" href="https://www.arxiv-vanity.com/papers/1707.02937/" target="_blank" rel="noopener"
+>“Checkerboard artifact free sub-pixel convolution”&lt;/a> 改进训练过后的效果（左边为原图，右边为处理后的图片）。在不同的模型、不同的数据、不同的训练方法下该问题严重程度不一，但或多或少都会存在。&lt;/p>
+&lt;p>&lt;img src="/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02937.webp"
+width="1052"
+height="279"
+srcset="/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02937_hud699c47303c35ce1724edc1a6b57c8a6_9280_480x0_resize_q75_h2_box_2.webp 480w, /p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02937_hud699c47303c35ce1724edc1a6b57c8a6_9280_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="左边为原图，右边为处理后的图片"
+class="gallery-image"
+data-flex-grow="377"
+data-flex-basis="904px"
+>&lt;/p>
+&lt;p>解决方法之一是不采用 sub-pixel、transpose convolution 之类的操作，而改用线性或邻近插值来替代，但这样一来计算量过大，而且效果也不太好。&lt;/p>
+&lt;h2 id="解决方案">解决方案&lt;/h2>
+&lt;p>从信号系统的角度，将解决传统线性时域系统的 checkerboard 问题扩展到卷积上。可以得到一种简单的后处理方法来完全解决这个问题（ &lt;a class="link" href="https://arxiv.org/pdf/1806.02658.pdf" target="_blank" rel="noopener"
+>https://arxiv.org/pdf/1806.02658.pdf&lt;/a> ）&lt;/p>
+&lt;p>据称：&lt;/p>
+&lt;blockquote>
+&lt;p>It is known that linear interpolators which consist of up-samplers and linear time-invariant systems cause checkerboard artifacts due to the periodic time-variant property.&lt;/p>
+&lt;/blockquote>
+&lt;p>通过令输出满足一系列约束使得这种因为时变（图像上是空间变化）导致的 checkerboard 得以完全抑制。具体而言就是输出的特征经过上采样零阶保持器，也就是遍历特征把当前点之前（左上方邻域）的值累加起来求平均作为该点输出。效果如下：&lt;/p>
+&lt;p>&lt;img src="/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02658_1.webp"
+width="888"
+height="205"
+srcset="/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02658_1_hu23aeaa3867a5f967b47427cda4487167_6656_480x0_resize_q75_h2_box_2.webp 480w, /p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02658_1_hu23aeaa3867a5f967b47427cda4487167_6656_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="处理前vs处理后"
+class="gallery-image"
+data-flex-grow="433"
+data-flex-basis="1039px"
+>&lt;/p>
+&lt;p>&lt;img src="/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02658_2.webp"
+width="823"
+height="212"
+srcset="/p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02658_2_hu8ec1c307b49a3580f87a9182a9126e89_11250_480x0_resize_q75_h2_box_2.webp 480w, /p/%E5%A6%82%E4%BD%95%E6%B6%88%E9%99%A4%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90%E6%97%B6%E7%9A%84%E6%A3%8B%E7%9B%98%E6%95%88%E5%BA%94/02658_2_hu8ec1c307b49a3580f87a9182a9126e89_11250_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="处理前vs处理后"
+class="gallery-image"
+data-flex-grow="388"
+data-flex-basis="931px"
+>&lt;/p>
+&lt;p>代码层面如下：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="c1">## 原文中的方法 A 或 B&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">output&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">moduel&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">x&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">output&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">torch&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">pixel_shuffle&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">output&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">out_scale&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># 先填充左上角用于模拟零阶保持器的滞后值输入，其实不用也可以，但是输出图像会往左上移一格&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">m_pad&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">nn&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">ReplicationPad2d&lt;/span>&lt;span class="p">((&lt;/span>&lt;span class="n">out_scale&lt;/span>&lt;span class="o">-&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="n">out_scale&lt;/span>&lt;span class="o">-&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">))&lt;/span> &lt;span class="c1"># ZeroPad2d 也可以&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">m_blur&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">nn&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">AvgPool2d&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">out_scale&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">stride&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">output&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">m_blur&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">m_pad&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">output&lt;/span>&lt;span class="p">))&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">## 原文中的方法 C&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">## 对于 nn.ConvTranspose2d() 的情况似乎还可以对 weight 进行卷积来做到，不太清楚什么意思&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>看起来效果不错，算法上相当于后处理增加了一次滤波，有不少优化空间。&lt;/p>
+&lt;p>实际使用会有一点模糊，毕竟仅采用 sub-pixel 能达到的实际分辨率提升很有限。&lt;/p></description></item><item><title>模型嫁接</title><link>/p/%E6%A8%A1%E5%9E%8B%E5%AB%81%E6%8E%A5/</link><pubDate>Wed, 23 Jun 2021 00:00:00 +0000</pubDate><guid>/p/%E6%A8%A1%E5%9E%8B%E5%AB%81%E6%8E%A5/</guid><description>&lt;p>源自 &lt;a class="link" href="https://github.com/fxmeng/filter-grafting" target="_blank" rel="noopener"
+>https://github.com/fxmeng/filter-grafting&lt;/a>&lt;/p>
+&lt;p>一种通过使用不同超参训练多个模型，并在训练过程中相互融合模型参数以达到减少无用卷积核数的方法，原理比较玄学，原论文发表在 CVPR 2020 上&lt;/p>
+&lt;h2 id="融合方法">融合方法&lt;/h2>
+&lt;p>根据每层模型参数的熵来自动调节融合权重 alpha&lt;br>
+首先：&lt;br>
+$$H(x)=\sum_i^np(x_i, x_{i+1})*log\frac{1}{p(x_i, x_{i+1})}$$&lt;br>
+将参数 x 根据值大小分为 n 等分，统计在 &lt;code>[i, i+1)&lt;/code> 区间的参数数量，得到概率进而计算熵 H(x)&lt;br>
+权重则为：&lt;br>
+$$ alpha = \frac{A}{\pi}\cdot arctan(c\cdot (E(W_i^{M2})-E(W_i^{M1})))+0.5 $$
+其中 A 和 c 为超参数，得出的 alpha 范围应该在 &lt;code>[0.5-A/2, 0.5+A/2]&lt;/code>，arctan 大概是为了将输出值域限定，并用 A、c 来调节不同熵差下的输出斜率（c 越小在零点附近就越平滑，c 越大零点附近越陡峭）&lt;/p>
+&lt;h2 id="实际效果">实际效果&lt;/h2>
+&lt;p>[[模型改进实验-202110221125]]&lt;/p>
+&lt;p>在小模型上部分时候指标会变好，效果看起来差不多，可能会产生行为有所不同的模型。总之在图生成领域不算多有效的方法，实验的模型和任务下零核数少也可能是原因，但有时候有好过没有&lt;/p></description></item><item><title>算法加速的几种方法</title><link>/p/%E7%AE%97%E6%B3%95%E5%8A%A0%E9%80%9F%E7%9A%84%E5%87%A0%E7%A7%8D%E6%96%B9%E6%B3%95/</link><pubDate>Wed, 16 Oct 2019 00:00:00 +0000</pubDate><guid>/p/%E7%AE%97%E6%B3%95%E5%8A%A0%E9%80%9F%E7%9A%84%E5%87%A0%E7%A7%8D%E6%96%B9%E6%B3%95/</guid><description>&lt;p>整理一下常见的算法加速方法。一般来说，对于高计算量的算法，加速是必然要考虑的事情。理想情况下，在编写算法时就应该考虑让算法便于优化，下面就针对性谈谈。&lt;/p>
+&lt;h2 id="1-多层循环">1. 多层循环&lt;/h2>
+&lt;p>图像处理算法大多需要遍历图像，如果遍历操作较为复杂，这部分的速度就会很慢。所以最好就是能保证最里层循环只有 &lt;strong>连续内存&lt;/strong> 的 &lt;strong>简单运算&lt;/strong> 。如果能够展开来不用 for 循环有时候也会些优化。&lt;/p>
+&lt;h2 id="2-simd">2. SIMD&lt;/h2>
+&lt;p>意思就是单指令多数据流，允许一次处理多个数据，比如有 128bit 寄存器使用 SIMD 指令则可以一次处理 4 个 32bit 数据。前面提到的多层循环内连续内存的简单运算就可以通过 SIMD 进行大幅优化。SIMD 的使用需要特定的数据结构，函数可以通过查 Intrinsics 或者直接翻头文件找到。因为是处理器相关，需要看具体处理器是否支持，以及具体实现，比如 Intel 的 SSE，ARM 的 Neon。知道了用法替换起来就很方便了：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-C++" data-lang="C++">&lt;span class="line">&lt;span class="cl">&lt;span class="c1">// neon 下的矩阵乘法实现
+&lt;/span>&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">&lt;/span>&lt;span class="kt">void&lt;/span> &lt;span class="nf">gemm_neon&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="k">const&lt;/span> &lt;span class="kt">float&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">lhs&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="kt">float&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">rhs&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="kt">float&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">out_mat&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="kt">int&lt;/span> &lt;span class="n">rhs_rows&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="kt">int&lt;/span> &lt;span class="n">rhs_cols&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="kt">int&lt;/span> &lt;span class="n">j&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">j&lt;/span> &lt;span class="o">&amp;lt;&lt;/span> &lt;span class="n">rhs_rows&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">++&lt;/span>&lt;span class="n">j&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kt">float&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">data1&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="kt">float&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="p">)&lt;/span>&lt;span class="n">lhs&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kt">float&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">data2&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="kt">float&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="p">)(&lt;/span>&lt;span class="n">rhs&lt;/span> &lt;span class="o">+&lt;/span> &lt;span class="n">j&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">rhs_cols&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">float32x4_t&lt;/span> &lt;span class="n">production&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">vdupq_n_f32&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="mf">0.f&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kt">int&lt;/span> &lt;span class="n">i&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">i&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">i&lt;/span> &lt;span class="o">&amp;lt;&lt;/span> &lt;span class="n">rhs_cols&lt;/span>&lt;span class="o">-&lt;/span>&lt;span class="mi">3&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">i&lt;/span>&lt;span class="o">+=&lt;/span>&lt;span class="mi">4&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">float32x4_t&lt;/span> &lt;span class="n">lfactor&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">vld1q_f32&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">data1&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">float32x4_t&lt;/span> &lt;span class="n">rfactor&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">vld1q_f32&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">data2&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">data1&lt;/span> &lt;span class="o">+=&lt;/span> &lt;span class="mi">4&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">data2&lt;/span> &lt;span class="o">+=&lt;/span> &lt;span class="mi">4&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">production&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">vmlaq_f32&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">production&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">lfactor&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">rfactor&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kt">float&lt;/span> &lt;span class="n">sum&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mf">0.0f&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span> &lt;span class="p">(;&lt;/span> &lt;span class="n">i&lt;/span>&lt;span class="o">&amp;lt;&lt;/span> &lt;span class="n">rhs_cols&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">++&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">sum&lt;/span> &lt;span class="o">+=&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">data1&lt;/span>&lt;span class="p">)&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">data2&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">data1&lt;/span>&lt;span class="o">++&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">data2&lt;/span>&lt;span class="o">++&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kt">float&lt;/span> &lt;span class="n">temp&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">4&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">vst1q_f32&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">temp&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">production&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">sum&lt;/span> &lt;span class="o">+=&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">temp&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">+&lt;/span>&lt;span class="n">temp&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">+&lt;/span>&lt;span class="n">temp&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">2&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">+&lt;/span>&lt;span class="n">temp&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">3&lt;/span>&lt;span class="p">]);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">out_mat&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">j&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">sum&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="3-复杂算法重组">3. 复杂算法重组&lt;/h2>
+&lt;p>有时候算法的各步骤执行次序会对算法效率有很大影响，特别对于内存管理而言，最好集中在循环外处理。算法本身也可能会有冗余的计算，通过一些方法合并计算会带来一些性能优化。&lt;br>
+这其中对于密集计算的特例就是向量化（Vectorization）。将 for 循环控制的计算转化为矩阵运算，这在使用 Python、Matlab 等来设计算法时可以说是必备的。&lt;/p>
+&lt;h2 id="4-牺牲空间换取速度">4. 牺牲空间换取速度&lt;/h2>
+&lt;p>最为典型的就是查找表，通过预先计算一部分结果，并保存在一个大数组里，从而使后续算法能够加速运算。&lt;/p>
+&lt;h2 id="5-二维数组优化">5. 二维数组优化&lt;/h2>
+&lt;p>我们习惯将图像表示为二维数组，这样处理起来也更方便，但是二维数组运算的方便却会导致运算效率的降低，根本原因在于内存的不连续。虽然对于优秀的程序员来说不是什么问题，但我比较想提一提这种方法：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-C++" data-lang="C++">&lt;span class="line">&lt;span class="cl">&lt;span class="kt">float&lt;/span> &lt;span class="o">**&lt;/span>&lt;span class="nf">init_matrix&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="kt">int&lt;/span> &lt;span class="n">rows&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="kt">int&lt;/span> &lt;span class="n">cols&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kt">int&lt;/span> &lt;span class="n">i&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kt">float&lt;/span> &lt;span class="o">**&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">m&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="kt">float&lt;/span> &lt;span class="o">**&lt;/span>&lt;span class="p">)&lt;/span>&lt;span class="n">malloc&lt;/span>&lt;span class="p">((&lt;/span>&lt;span class="n">size_t&lt;/span>&lt;span class="p">)(&lt;/span>&lt;span class="n">rows&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="k">sizeof&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="kt">float&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="p">)));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="kt">float&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="p">)&lt;/span>&lt;span class="n">malloc&lt;/span>&lt;span class="p">((&lt;/span>&lt;span class="n">size_t&lt;/span>&lt;span class="p">)(&lt;/span>&lt;span class="n">rows&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">cols&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="k">sizeof&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="kt">float&lt;/span>&lt;span class="p">)));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">i&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">i&lt;/span> &lt;span class="o">&amp;lt;&lt;/span> &lt;span class="n">rows&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">++&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="o">-&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">+&lt;/span> &lt;span class="n">cols&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">m&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kt">void&lt;/span> &lt;span class="nf">delete_matrix&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="kt">float&lt;/span> &lt;span class="o">**&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">free&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">]);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">free&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="6-矩阵分解">6. 矩阵分解&lt;/h2>
+&lt;p>将空间滤波分解成行列滤波，可以提升速度以及降低容量，这部分在 &lt;a class="link" href="http://dlib.net/" target="_blank" rel="noopener"
+>Dlib&lt;/a> 中有具体的实现，了解得不是很多，不过除了这种简单分解外估计还有不少门道。&lt;/p>
+&lt;h2 id="7-l1-cache--汇编--硬件">7. L1 cache / 汇编 / 硬件&lt;/h2>
+&lt;p>L1 cache 也就是利用缓存来优化密集存取的代码。大体来说减少变量的使用，尽量处理连续的空间。而汇编的话直接操作寄存器，可以对算法做非常底层的优化，针对具体芯片架构还会有更多可以优化的地方，甚至使用 FPGA 或 DSP 来并行运算、高速信号处理，或者合起来异构计算。这些我也不太了解，大概是 HPC 的内容了。&lt;/p>
+&lt;h2 id="8-多线程多进程优化">8. 多线程/多进程优化&lt;/h2>
+&lt;p>也就是 pthread 之类的，在系统层面上做优化，开发的时候注意好 I/O 阻塞、共享资源加锁、进程间通信等问题就好了。&lt;br>
+这里 Python 的 默认解释器 CPython 由于 全局解释锁（GIL） 的存在所以多线程不太灵光，可以采用多进程 + 协程的方式利用好多核 CPU。&lt;/p>
+&lt;h2 id="9-等价运算">9. 等价运算&lt;/h2>
+&lt;p>对于一些算法，有时候可以在数学上找到等价的运算形式，相当于走捷径，比如矩阵运算的一些等价性质，DFT 处理实信号的一些性质；或者转换后能够结合具体软硬件环境进行加速，像 Winograd 用中间变量和加法运算来减少乘法运算。这些转换是可以直接替换原有算法或者视条件替代使用的。&lt;br>
+还有一种比较邪门的方法就是寻找近似的计算，这方面是机器学习的特长。特别如果拥有大量的输入输出结果，但苦于设计映射的算法，这时候直接用机器学习去学习映射的矩阵会是简单又高效的做法。还有一种情况就是处理的数据自身存在大量冗余，传统方法计算量又很大，这时候可以通过在缩小冗余的数据上进行传统方法处理，然后用机器学习之类的方法对数据尺度进行扩大。NVIDIA 的 DLSS2.0 就是这种情况的优秀实现，在低分辨率下快速渲染，然后超采样获得高分辨率输出，利用了多帧信息以及各种奇技淫巧来使得最终输出就像直接处理高分辨率图像一样，这是相当有难度的，同时也是相当有价值的。&lt;/p></description></item><item><title>人像分割</title><link>/p/%E4%BA%BA%E5%83%8F%E5%88%86%E5%89%B2/</link><pubDate>Fri, 19 Apr 2019 00:00:00 +0000</pubDate><guid>/p/%E4%BA%BA%E5%83%8F%E5%88%86%E5%89%B2/</guid><description>&lt;img src="/p/%E4%BA%BA%E5%83%8F%E5%88%86%E5%89%B2/Einstein.png" alt="Featured image of post 人像分割" />&lt;p>这部分是关于在低计算量下完成人像分割的工作，因为时间充裕，所以调查尝试得比较多，最终完成的效果还不错。&lt;/p>
+&lt;h2 id="引言">引言&lt;/h2>
+&lt;p>人像分割（portrait segmentation）属于语义分割的子集，某种程度上类似于只专注人的前景分割，可以看成是二分类的语义分割。不过这里的应用场景是半身肖像，对于效果的评价更加专注于分割边缘和细节的质量，现在看来这次的工作在这方面其实做得比较一般，只是就通常的 IoU 意义上来看还不错。&lt;/p>
+&lt;p>总体来说，人像分割方面的论文比较少，典型的就是 Xiaoyong Shen 等人的工作 [1] [2]。不过实际尝试过程中发现，其中的很多技巧无法有效的应用于低计算量的场景中，固定先验的引入也会导致分割效果在某些情况下变差。&lt;/p>
+&lt;h2 id="实现">实现&lt;/h2>
+&lt;h3 id="数据集">数据集&lt;/h3>
+&lt;p>数据集方面因为我采取了逐步迁移训练，多次 fine-tuning 的方式，所以需要从 ImageNet 到 COCO 人像子集再到标准半身人像分割的数据集。COCO 人像子集是从 COCO 中筛选出含人类（且占面积较大）的部分，大约 4 万张；半身人像分割的数据集训练集一千多张，验证集 50 张，测试集 300 张；还有一些私有的测试集。&lt;br>
+之所以这样做主要是因为最终用于应用场景的数据集过少，而且从 OSVOS[3] 等文中得到了更多的启发。&lt;/p>
+&lt;div align=center>
+&lt;img src="osvos.png">
+OSVOS 的做法
+&lt;/div>
+&lt;h3 id="设计">设计&lt;/h3>
+&lt;p>我主要尝试了 ENet [4]、FCN [5]、FCN dilated convolution 版本 [6]、UNet [7] 的改进版 以及 类 DeepLab V3+ [8] 中的方法。为了保持计算量，除了 [4] 外，我都采用了轻量化网络 ShuffleNet [9] 作为 backbone 来进行复现，大部分网络的输入限制为 224x224。&lt;/p>
+&lt;p>对于 UNet 的改进版，因为是冲着实时而设计的，所以在 decoder 的设计上，尤其是底层特征的引入上显著减少了滤波器数量。当 output stride 为 4 时，可以得到的模型性能为：参数量 79.54K, FLOPS 24.44M, 访存量 46.98MB，可以达到实时。&lt;/p>
+&lt;p>对于类 DeepLab V3+ 的版本，为了尽可能的压缩计算量，我最大限度的利用了 Depthwise Convolution、Dilation 以及 Channel Shuffle 的特性，同时为平衡精度将 output stride 限制为 2（损失非常少），decoder 也改成了更为节省计算量的简单版本，模型性能为：参数量 965.49K, FLOPS 743.37M, 访存量 392.87MB。&lt;/p>
+&lt;blockquote>
+&lt;ul>
+&lt;li>&lt;em>来自底层特征的 skip-connection 是有很明显的边缘细化效果的，但同时也十分容易过拟合，这是值得注意的问题。&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;ul>
+&lt;li>&lt;em>尽管我把 ASPP 写的很省，但尝试后发现如果那个结构不加 ASPP 的话性能会很差。&lt;/em>&lt;/li>
+&lt;li>&lt;em>关于深度，尝试的结果似乎说明了 Encoder 部分需要足够的深（至少 8 个 res block 是不够的），而 Decoder 则不需要太复杂（没有足够的证据，不过增加 2 层能带来的好处不大）&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;h3 id="训练">训练&lt;/h3>
+&lt;p>训练方面，UNet（实时） 和 类 DeepLab V3+ 方法因为是从头搭起，所以就像上面说的一样，需要两次 fine-tuning，其余方法并没有经过 COCO 人像预训练。优化方法我用的是 SGD+Momentum，事实上这是因为用其他的一些优化方法会导致“零核现象”的发生，我在以前的一篇文章中分析过这点，不知道这个现象和性能的下降有多大关系，但如果用 SGD 的话就不会有这种事情发生，而且性能会更好。&lt;/p>
+&lt;blockquote>
+&lt;ul>
+&lt;li>&lt;em>COCO 人像部分的预训练的加入很有效，但是必须使用和应用场景十分相似的部分作为预训练才有效，不筛选的话很可能没有效果上的影响。&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;/blockquote>
+&lt;ul>
+&lt;li>&lt;em>使用大 Momentum（我用的 0.99）似乎不错，训练速度会很快而且效果也不会差（实验尝试似乎比 0.9 还要好）。&lt;/em>&lt;/li>
+&lt;li>&lt;em>实际训练时还发现有挺严重的过拟合，所以做了些数据集扩增，结果挺有效的。&lt;/em>&lt;/li>
+&lt;li>&lt;em>在 output stride 为 8 时增加一个辅助损失也是有效的。&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;h3 id="测试">测试&lt;/h3>
+&lt;p>在 [1] 中给出的数据集中测试结果如下（其中我加入了 Std 度量用于观察分割的稳定性，意为 IoU 的标准差）&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Method&lt;/th>
+&lt;th style="text-align:center">mIoU&lt;/th>
+&lt;th style="text-align:center">Std&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">ENet&lt;/td>
+&lt;td style="text-align:center">94.04%&lt;/td>
+&lt;td style="text-align:center">6.25%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">FCN&lt;/td>
+&lt;td style="text-align:center">95.73%&lt;/td>
+&lt;td style="text-align:center">3.10%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">FCN + dilated&lt;/td>
+&lt;td style="text-align:center">96.04%&lt;/td>
+&lt;td style="text-align:center">3.27%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">UNet（实时）&lt;/td>
+&lt;td style="text-align:center">95.32%&lt;/td>
+&lt;td style="text-align:center">4.03%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">类 DeepLab V3+&lt;/td>
+&lt;td style="text-align:center">96.4%&lt;/td>
+&lt;td style="text-align:center">3.25%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">PortraitFCN+[1]&lt;/td>
+&lt;td style="text-align:center">95.91%&lt;/td>
+&lt;td style="text-align:center">-&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>另外我还自己标了个五十多张明暗、运动、背景复杂度变化都比较大的测试图片，在此数据集上测试结果为&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Method&lt;/th>
+&lt;th style="text-align:center">mIoU&lt;/th>
+&lt;th style="text-align:center">Std&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">ENet&lt;/td>
+&lt;td style="text-align:center">61.42%&lt;/td>
+&lt;td style="text-align:center">20.04%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">FCN&lt;/td>
+&lt;td style="text-align:center">87.71%&lt;/td>
+&lt;td style="text-align:center">12.01%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">FCN + dilated&lt;/td>
+&lt;td style="text-align:center">89.43%&lt;/td>
+&lt;td style="text-align:center">10.62%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">UNet（实时）&lt;/td>
+&lt;td style="text-align:center">91.96%&lt;/td>
+&lt;td style="text-align:center">3.95%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">类 DeepLab V3+&lt;/td>
+&lt;td style="text-align:center">93.7%&lt;/td>
+&lt;td style="text-align:center">2.3%&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>可以看到类 DeepLab V3+ 方法测试结果还是挺不错的，其余的多个私有测试集上表现也不错，它在 MIX2 上前向一张图片大概需要 120ms。除此之外，达到实时性能的 UNet 改进版也不错，两者在 P-R 曲线上差异不是很大。&lt;/p>
+&lt;div align=center>
+&lt;img src="performance.png" width="80%">
+非实时与实时网络的 P-R 曲线比较
+&lt;/div>
+&lt;h2 id="最终的效果">最终的效果&lt;/h2>
+&lt;div align=center>
+&lt;img src="full.png" width="70%">
+&lt;/div>
+&lt;p>可以看到边缘的跟踪还是不错的，除此之外，头发的细节处理也可以在顶部图中看到。&lt;/p>
+&lt;p>因为 output stride 为 2 导致分割边缘在放大后加大了间隔，看上去和实际边缘有些距离。在下面的图中可以明显看到这种在人和物件之间的边界、甚至透明物件覆盖影响下算法的处理情况。&lt;/p>
+&lt;div align=center>
+&lt;img src="pony.png" width="70%">
+&lt;/div>
+&lt;p>虽然训练集全都是单人肖像，但多人的情况也能够分割，具体效果还是要看人物所占的尺度等。&lt;/p>
+&lt;div align=center>
+&lt;img src="multi.jpg" width="70%">
+&lt;/div>
+&lt;p>[参考文献]:&lt;br>
+[1] &lt;a class="link" href="http://xiaoyongshen.me/webpage_portrait/papers/portrait_eg16.pdf" target="_blank" rel="noopener"
+>《Automatic Portrait Segmentation for Image Stylization》&lt;/a>&lt;br>
+[2] &lt;a class="link" href="https://arxiv.org/pdf/1704.08812.pdf" target="_blank" rel="noopener"
+>《Automatic Real-time Background Cut for Portrait Videos》&lt;/a>&lt;br>
+[3] &lt;a class="link" href="http://openaccess.thecvf.com/content_cvpr_2017/papers/Caelles_One-Shot_Video_Object_CVPR_2017_paper.pdf" target="_blank" rel="noopener"
+>《One-Shot Video Object Segmentation》&lt;/a>&lt;br>
+[4] &lt;a class="link" href="https://arxiv.org/pdf/1606.02147.pdf" target="_blank" rel="noopener"
+>《ENet: A Deep Neural Network Architecture forReal-Time Semantic Segmentation》&lt;/a>&lt;br>
+[5] &lt;a class="link" href="https://arxiv.org/pdf/1411.4038.pdf" target="_blank" rel="noopener"
+>《Fully Convolutional Networks for Semantic Segmentation》&lt;/a>&lt;br>
+[6] &lt;a class="link" href="https://arxiv.org/pdf/1702.08502.pdf" target="_blank" rel="noopener"
+>《Understanding Convolution for Semantic Segmentation》&lt;/a>&lt;br>
+[7] &lt;a class="link" href="https://arxiv.org/pdf/1505.04597.pdf" target="_blank" rel="noopener"
+>《U-Net: Convolutional Networks for BiomedicalImage Segmentation》&lt;/a>&lt;br>
+[8] &lt;a class="link" href="https://arxiv.org/pdf/1802.02611.pdf" target="_blank" rel="noopener"
+>《Encoder-Decoder with Atrous SeparableConvolution for Semantic Image Segmentation》&lt;/a>&lt;br>
+[9] &lt;a class="link" href="https://arxiv.org/pdf/1707.01083.pdf" target="_blank" rel="noopener"
+>《ShuffleNet: An Extremely Efficient Convolutional Neural Network for MobileDevices》&lt;/a>&lt;/p></description></item><item><title>Caffe使用问题记录</title><link>/p/caffe%E4%BD%BF%E7%94%A8%E9%97%AE%E9%A2%98%E8%AE%B0%E5%BD%95/</link><pubDate>Tue, 07 Aug 2018 00:00:00 +0000</pubDate><guid>/p/caffe%E4%BD%BF%E7%94%A8%E9%97%AE%E9%A2%98%E8%AE%B0%E5%BD%95/</guid><description>&lt;p>以往在使用 caffe 中遇到的部分问题记录。&lt;/p>
+&lt;h2 id="使用教程">使用教程&lt;/h2>
+&lt;p>Caffe 一般通过编译生成的可执行文件 caffe（一般路径为 &lt;code>$CAFFE_PATH/build/tools/caffe&lt;/code>）来进行网络训练和测试。&lt;/p>
+&lt;h3 id="tldr">TL;DR&lt;/h3>
+&lt;ol>
+&lt;li>Python 调用（pycaffe 路径 &lt;code>caffe/python/caffe&lt;/code>）&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl"> &lt;span class="kn">import&lt;/span> &lt;span class="nn">caffe&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">net&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">Net&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">prototxt&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">caffemodel&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">TEST&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="c1"># 设置网络&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;对应层的name&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="o">...&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="nb">input&lt;/span> &lt;span class="c1"># 操作输入输出&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">pred&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">foward&lt;/span>&lt;span class="p">()&lt;/span> &lt;span class="c1"># 前向取出最终层结果, 也可以通过 pred = net.blobs[&amp;#39;name&amp;#39;].data 来拿到&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;ol start="2">
+&lt;li>C++ 前向追踪：&lt;br>
+&lt;code>net.cpp::Forward -&amp;gt; layer.hpp::Forward -&amp;gt; 各layer的Forward (src/caffe/layers/*.cpp &amp;amp; *.cu)&lt;/code>&lt;/li>
+&lt;/ol>
+&lt;p>自定义修改：&lt;/p>
+&lt;ol>
+&lt;li>自定义网络结构 ( 根据 &lt;code>caffe.proto&lt;/code> ):
+&lt;ul>
+&lt;li>改 &lt;code>train.prototxt&lt;/code>、&lt;code>solver.prototxt&lt;/code>、&lt;code>test.prototxt&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>自定义层:
+&lt;ul>
+&lt;li>在 &lt;code>src/caffe/layers/*&lt;/code> 下新增 .cpp、.cu&lt;/li>
+&lt;li>在 &lt;code>include/caffe/layers*&lt;/code> 下新增 .hpp&lt;/li>
+&lt;li>改 &lt;code>caffe.proto&lt;/code>，增加参数条目&lt;/li>
+&lt;li>部分复杂的子函数实现会放在 &lt;code>src/caffe/util&lt;/code> 内&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h3 id="训练所需文件">训练所需文件&lt;/h3>
+&lt;ul>
+&lt;li>&lt;code>*.prototxt&lt;/code>：用于定义网络结构的文件，一般在网络本身的基础上加入了训练和测试过程所需的网络模块，以及模块相应的训练和测试用参数。&lt;/li>
+&lt;li>&lt;code>*_deploy.prototxt&lt;/code>：同样是定义网络结构的文件，但只包含了前向推理部分，没有训练部分的模块和参数。&lt;/li>
+&lt;li>&lt;code>*_solver.prototxt&lt;/code>：用于训练和测试的配置文件，类似学习率、学习策略、惩罚项和输出信息等，可在 &lt;code>$CAFFE_PATH/src/caffe/proto/caffe.proto&lt;/code> 中的 &lt;code>SolverParameter&lt;/code> 找到具体配置项信息。&lt;/li>
+&lt;/ul>
+&lt;p>上述文件的名字可随意更改，不过一般会加上这些后缀用以区分。&lt;/p>
+&lt;h3 id="路径相关">路径相关&lt;/h3>
+&lt;p>训练时需要指定 &lt;code>*_solver.prototxt&lt;/code> 的路径，并在 &lt;code>*_solver.prototxt&lt;/code> 指明网络 &lt;code>*.prototxt&lt;/code> 的路径（也可以分开指定训练和测试用的网络），还需要定义输出模型以及状态的路径前缀 &lt;code>snapshot_prefix&lt;/code>。&lt;br>
+一般 &lt;code>*.prototxt&lt;/code> 里还需要在输入数据层指明输入数据集的路径。&lt;/p>
+&lt;h3 id="指令相关">指令相关&lt;/h3>
+&lt;p>训练：（可以加上预训练模型 &lt;code>-weights /路径/*.caffemodel&lt;/code> 或 恢复训练状态 &lt;code>-snapshot /路径/*.solverstate&lt;/code>，&lt;code>*.solverstate&lt;/code> 是在 &lt;code>*.caffemodel&lt;/code> 基础上加上了训练的状态信息）&lt;/p>
+&lt;pre>&lt;code>$CAFFE_PATH/build/tools/caffe train -solver *_solver.prototxt
+&lt;/code>&lt;/pre>
+&lt;p>测试：（需要指定训练测试用的网络和训练好的模型，测试的样本数为 TEST_PHASE 的 &lt;code>batch_size&lt;/code> x &lt;code>iterations&lt;/code>）&lt;/p>
+&lt;pre>&lt;code>$CAFFE_PATH/build/tools/caffe test -model *.prototxt -weights *.caffemodel -iterations 100 -gpu 0
+&lt;/code>&lt;/pre>
+&lt;p>前向：用 python 接口调用 caffe 完成，基本流程形如&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">caffe&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">Net&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">prototxt_path&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">weights_path&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">caffe&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">TEST&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;data&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="o">...&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">input_image&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">forward&lt;/span>&lt;span class="p">()&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">label&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">net&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">blobs&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="s1">&amp;#39;label&amp;#39;&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">data&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h3 id="caffe-网络相关">Caffe 网络相关&lt;/h3>
+&lt;p>Caffe 的网络 &lt;code>Net&lt;/code> 是由各种层 &lt;code>Layer&lt;/code> 组成的有向无环图，网络层通过 &lt;code>Blob&lt;/code> 来存储 feature maps，具体层的实现在 &lt;code>$CAFFE_PATH/src/caffe/layers/&lt;/code> 和 &lt;code>$CAFFE_PATH/include/caffe/layers/&lt;/code> 里，其传递参数定义于 &lt;code>$CAFFE_PATH/src/caffe/proto/caffe.proto&lt;/code>。网络结构文件中有什么看不懂或者需要深入了解的，找这三个地方就对了。&lt;/p>
+&lt;p>训练网络一般包含训练过程所需要的所有部分，比如数据输入层（如 Data Layer），Loss 层（如 SoftmaxWithLoss Layer），定义好后 Caffe 会自己输入数据然后计算输出 loss 并更新参数。前向网络同理。&lt;/p>
+&lt;p>如果需要用到 Caffe 没有的自定义网络层，需要自己编写相应 C++/CUDA 代码，放置于上述两个文件夹中，如果有传入参数还需要在 &lt;code>caffe.proto&lt;/code> 中添加相应需要传入的参数配置。对于不好实现而且不需要 gpu 加速的自定义层，可以通过 python layer 来实现。&lt;/p>
+&lt;p>对于有复杂操作的网络，比如 loss 需要在外部计算，则可以通过 Caffe 的 python 接口实现，在 python 环境中做训练更新。&lt;/p>
+&lt;h3 id="关于分割网络的训练说明">关于分割网络的训练说明&lt;/h3>
+&lt;p>数据输入层 &lt;code>DenseImageData&lt;/code> 是自定义层，在 &lt;code>dense_image_data_param&lt;/code> 的 &lt;code>source&lt;/code> 中指明了输入图片集的路径，txt 文件内的格式是：&lt;br>
+&amp;ldquo;样本图路径 标签路径&amp;rdquo;&lt;/p>
+&lt;p>标签与样本图同等大小（224x224），单通道，其中像素值 0 为前景，1 为背景。&lt;/p>
+&lt;p>loss_s8、loss 的 class_weighting 为对应标签的 loss 权重，用于解决样本不平衡。class_weighting 计算方法：对所有数据集标签统计各类别个数，比如 0 的个数，1 的个数。&lt;code>class_weighting_0 = num(1)/(num(1)+num(0))&lt;/code>、&lt;code>class_weighting_1 = num(0)/(num(1)+num(0))&lt;/code>。&lt;/p>
+&lt;h2 id="缺陷记录">缺陷记录&lt;/h2>
+&lt;ul>
+&lt;li>&lt;code>Xavier&lt;/code>初始化没有乘上增益 (ReLU应乘根号2, 等等)&lt;/li>
+&lt;li>在matlab上训练得出的模型是col-major,需要将所有矩阵参数转置才能在其他地方用&lt;/li>
+&lt;li>老版本caffe在初次前向时会比较慢, 新版未知&lt;/li>
+&lt;li>caffe 初始化数据层时启动线程是 &lt;strong>TEST&lt;/strong> 和 &lt;strong>TRAIN&lt;/strong> 并行进行的, 即使将&lt;code>test_initialization&lt;/code>设置为&lt;code>false&lt;/code>也会进行一次__TEST__的数据 prefetch, 同样会进行&lt;code>Transform&lt;/code>, 所以要注意相关的共享变量.&lt;/li>
+&lt;li>BatchNorm 的 eps 默认为 1e-5, 这个数值是 切实 会对结果产生一定影响的, 在 absorb 参数时也要注意&lt;/li>
+&lt;/ul>
+&lt;h2 id="过程记录">过程记录&lt;/h2>
+&lt;ul>
+&lt;li>后向根据&lt;code>top_diff&lt;/code>和前向结果算出各&lt;code>blob&lt;/code>参数的&lt;code>diff&lt;/code>, 以及&lt;code>bottom&lt;/code>的&lt;code>diff&lt;/code>, 所以分别对&lt;code>blob&lt;/code>和&lt;code>bottom&lt;/code>求导&lt;/li>
+&lt;li>传播时记得不同微分层乘上前面的梯度值&lt;code>top_diff&lt;/code>,后传多个梯度值的话全部加起来&lt;/li>
+&lt;li>&lt;code>setup&lt;/code>是在加载网络时调用的, 加载完后不再调用&lt;/li>
+&lt;/ul>
+&lt;h2 id="错误记录">错误记录&lt;/h2>
+&lt;ol>
+&lt;li>Check failed: data_&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>为 &lt;code>blob shape&lt;/code> 错误, 一般是 &lt;code>reshape&lt;/code> 函数出错, 也可能是网络设计错误导致 &lt;code>shape&lt;/code> 传过来时负值错误&lt;/li>
+&lt;/ul>
+&lt;h2 id="问题记录">问题记录&lt;/h2>
+&lt;ol>
+&lt;li>caffe模型测试时&lt;code>batch_norm&lt;/code>层的use_global_stats设为false居然没影响???? 错觉&lt;/li>
+&lt;li>训练过程开始良好, 中途出现后方部分卷积开始死亡(参数值非常低), 然后向前传染, 大部分卷积死亡, 表现为验证集上非常不稳定
+&lt;ul>
+&lt;li>推测是ReLU死亡&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>caffe 和 opencv 一起 import 会出错
+&lt;ul>
+&lt;li>added &lt;code>-Wl,-Bstatic -lprotobuf -Wl,-Bdynamic&lt;/code> to &lt;code>LDFLAGS&lt;/code> and removed &lt;code>protobuf&lt;/code> from &lt;code>LIBRARIES&lt;/code> ( 参照 &lt;a class="link" href="https://github.com/BVLC/caffe/issues/1917" target="_blank" rel="noopener"
+>https://github.com/BVLC/caffe/issues/1917&lt;/a> )&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;h2 id="犯2记录">犯2记录&lt;/h2>
+&lt;ol>
+&lt;li>&lt;code>resize&lt;/code>层或者叫&lt;code>upsample&lt;/code> &lt;code>upscale&lt;/code> 层, 若训练时使用的缩放算法不同, 在卷积到比较小的时候(4x4)之类的, 会由于策略差异导致缩放前后误差非差大&lt;/li>
+&lt;li>test 或 upgrade 时 model 和 prototxt 写反&lt;/li>
+&lt;/ol>
+&lt;blockquote>
+&lt;p>[libprotobuf ERROR google/protobuf/text_format.cc:274] Error parsing text-format caffe.NetParameter: 2:1: Invalid control characters encountered in text.&lt;br>
+&amp;hellip;..&lt;br>
+*** Check failure stack trace: ***&lt;br>
+已放弃 (核心已转储)&lt;/p>
+&lt;/blockquote>
+&lt;ol start="3">
+&lt;li>二分类问题 SoftmaxWithLoss 层不要设 ignore_label, ignore_label 是会忽略该 label 的 loss 和 diff 传递, 导致结果会完全倒向另一个 label , 因为 SoftmaxWithLoss 是计算准确率来算 loss 的&lt;/li>
+&lt;/ol>
+&lt;h2 id="常见安装问题">常见安装问题&lt;/h2>
+&lt;ol>
+&lt;li>
+&lt;p>一般常见 protobuf 问题, 因为 Tensorflow 也用 protobuf, 不仅用, 还会自动升级 protobuf, 而 caffe 不怎么支持新版本的 protobuf, 所以如果配置了其他开源库的开发环境之后 caffe 报错了, 基本可以从几个方面检查 protobuf 有没问题.&lt;/p>
+&lt;ul>
+&lt;li>&lt;code>pip list&lt;/code>, 查看 protobuf 版本, 一般 2.6.1 比较通用, 如果是 3.5 那就换吧. 如果同时使用了 python2.7 和 python 3.5 的话那还要注意 pip 也分 pip2 和 pip3, 安装的库也分别独立. 可以在 &lt;code>/usr/bin&lt;/code>, &lt;code>/usr/local/bin&lt;/code>, &lt;code>/$HOME/.local/bin&lt;/code> 下找到 pip 脚本, 打开就能看到它用的是 python2.7 还是 python3.5. ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>protoc --version&lt;/code>, protobuf 依赖的东西, 查看它的版本和 protobuf 的是否一样, 不一样的话可以通过下载相应版本 release, 或者从源码安装 protobuf. 然后在 &lt;code>/etc/ld.so.conf&lt;/code> 里面添加上一行 &lt;code>/usr/local/lib&lt;/code>, 然后 &lt;code>sudo ldconfig&lt;/code> 更新下链接库就行了. ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>apt list | grep &amp;quot;protobuf&amp;quot;&lt;/code>, 有时候会有用 &lt;code>apt-get install&lt;/code> 和 &lt;code>pip install&lt;/code> 装了两种不同版本的 protobuf 的情况, 这时候可以 &lt;code>apt&lt;/code> 删除并重新安装 protobuf ( &lt;em>然后出现了下一个问题&lt;/em> )&lt;/li>
+&lt;li>&lt;code>File already exists in database: caffe.proto &lt;/code>, 库链接问题或者版本问题 ( 2.6.1 不好用 ), &lt;code>pip uninstall protobuf&lt;/code> 删掉 protobuf, 重启, 加 -fPIC 到 configure, 然后 &lt;code>./configure --disable-shared&lt;/code>, 然后在 protobuf 3.3 版本下 &lt;code>cd $PROTOBUF_BUILD_DIR/python&lt;/code>, &lt;code>python setup.py build&lt;/code>, &lt;code>python setup.py test&lt;/code>, &lt;code>python setup.py install&lt;/code> ( &lt;em>然而出现了下一个问题&lt;/em> )
+&lt;ul>
+&lt;li>还可能是 caffe 玄学问题, 总之最简单的就是直接把能用的 caffe 替换过来&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>&lt;code>make all&lt;/code> 时出现一堆 protobuf 未定义的引用问题. ( &lt;em>未解, 回溯 2.6.1&lt;/em> )&lt;/li>
+&lt;li>2.6.1:
+&lt;ul>
+&lt;li>
+&lt;p>&lt;code>caffe_pb2.py: syntax error&lt;/code>, 注释掉默认 caffe 的 &lt;code>python/caffe/proto/caffe_pb2.py&lt;/code>, 至于为什么项目 caffe 没有用自己的 &lt;code>caffe_pb2.py&lt;/code> 而用到默认 caffe, 是因为没有成功 &lt;code>make pycaffe&lt;/code> ??? 总之应该是版本问题.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>File already exists in database: caffe.proto&lt;/code> 依旧存在这个问题, 在 &lt;code>import caffe&lt;/code> 后 &lt;code>import cv2&lt;/code> 会发生, 还是需要静态链接 protobuf, 这样可以解决:&lt;/p>
+&lt;ul>
+&lt;li>
+&lt;blockquote>
+&lt;p>linking caffe against libprotobuf.a instead of libprotobuf.so could solve this issue&lt;/p>
+&lt;/blockquote>
+&lt;/li>
+&lt;li>
+&lt;blockquote>
+&lt;p>I changed caffe&amp;rsquo;s Makefile. Specifically, I added -Wl,-Bstatic -lprotobuf -Wl,-Bdynamic to LDFLAGS and removed protobuf from LIBRARIES.
+I have uploaded my Makefile to gist (&lt;a class="link" href="https://gist.github.com/tianzhi0549/773c8dbc383c0cb80e7b%29" target="_blank" rel="noopener"
+>https://gist.github.com/tianzhi0549/773c8dbc383c0cb80e7b)&lt;/a>. You could check it out to see what changes I made (Line 172 and 369).&lt;/p>
+&lt;/blockquote>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>File &amp;quot;/usr/lib/python2.7/dist-packages/caffe/pycaffe.py&amp;quot;, line 13, in &amp;lt;module&amp;gt; from ._caffe import Net, SGDSolver, NesterovSolver, AdaGradSolver, libcaffe.so.1.0.0: cannot open shared object file: No such file or directory&lt;/code>. 这是 python 又喵了咪了用了默认 release 版 caffe, 删掉 &lt;code>/usr/lib/python2.7/dist-packages/caffe&lt;/code>, 然后在工程头处 &lt;code>import sys&lt;/code> 加&lt;code>sys.path.insert('/home/sad/ENet/caffe-enet/python')&lt;/code> 和 &lt;code>sys.path.insert('/home/sad/ENet/caffe-enet/python/caffe')&lt;/code> 再 &lt;code>import caffe &lt;/code>, 问题终于解决!&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>
+&lt;p>&lt;code>libcudnn.so.5: cannot open shared object file: No such file or directory&lt;/code>, ld 抽风, 需要专门刷新下 cuda 链接路径 :&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">sudo ldconfig /usr/local/cuda-8.0/lib64
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;ol start="3">
+&lt;li>&lt;code>*** SIGSEGV (@0x100000049) received by PID 703 (TID 0x7f52cbb1c9c0) from PID 73; stack trace: ***&lt;/code> 或者 &lt;code>Segmentation fault (core dumped)&lt;/code>, 可能是 python 层的使用出了问题&lt;/li>
+&lt;li>段错误, &lt;code>import caffe&lt;/code> 退出后错误, 有可能是用了 opencv contrib 的 &lt;code>LIBRARY&lt;/code>, 在 &lt;code>Makefile&lt;/code> 里删掉 &lt;code>opencv_videoc&lt;/code> 什么的&amp;hellip;&lt;/li>
+&lt;/ol>
+&lt;h2 id="推荐安装方法">推荐安装方法&lt;/h2>
+&lt;p>使用 CMake 来安装，推荐 ubuntu16.04 + gcc5.4 + python2.7 + CUDA8.0 + opencv3.4 + protobuf2.6&lt;/p>
+&lt;p>实测 Ubuntu18.04 + gcc7 + python2.7 + CUDA10.2 + opencv3.4 + protobuf 3.11? 可以运行，但不支持 cudnn7.6.5。CUDA10.0 + cudnn7.3.1可以正常运作。&lt;/p></description></item><item><title>关于 LRA 和 Force Regularization 的探索</title><link>/p/%E5%85%B3%E4%BA%8E-lra-%E5%92%8C-force-regularization-%E7%9A%84%E6%8E%A2%E7%B4%A2/</link><pubDate>Tue, 07 Aug 2018 00:00:00 +0000</pubDate><guid>/p/%E5%85%B3%E4%BA%8E-lra-%E5%92%8C-force-regularization-%E7%9A%84%E6%8E%A2%E7%B4%A2/</guid><description>&lt;p>这部分是将《Coordinating Filters for Faster Deep Neural Networks》中提到的 &lt;em>Force Regularization&lt;/em> 和 &lt;em>LRA&lt;/em> 用于实际项目的效果，虽然现在看来不是很严谨，不过算是一次很好的尝试。&lt;/p>
+&lt;h2 id="设定">设定&lt;/h2>
+&lt;p>为了探索 &lt;em>Low-Rank Approximations ( LRA )&lt;/em> 和 &lt;em>Force Regularization&lt;/em> ( 参考 &lt;em>Wen. &amp;ldquo;Coordinating Filters for Faster Deep Neural Networks&amp;rdquo; ICCV 2017&lt;/em> ) 在我的工程上的实际效果, 进行了一些实际测试. 由于时间限制, 主要进行了两次探索, 分别为:&lt;/p>
+&lt;ul>
+&lt;li>LRA
+&lt;ul>
+&lt;li>单次大降秩(rank ratio 0.48)&lt;/li>
+&lt;li>在大降秩的基础上小降秩(rank ratio 0.8)&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>LRA + Force Regularization
+&lt;ul>
+&lt;li>多次迭代 LRA (每次 rank ratio 0.9), FR (0.003 Degradation)&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>此外还有在 MNIST 上对 LeNet 的对照测试, 结果与文中叙述结论基本一致, Force Regularization 后 LRA 带来的压缩率有进一步的提高, 但主要在全连接层体现 (实验时卷积层个数完全没变), 尚未使用其他网络进行测试, 也没有观察出 Force Regularization 后卷积核的变化, 可能需要进一步实验 (调整 Force Regularization 参数, 用更好的可视化方法 t-SNE 等)&lt;/p>
+&lt;h2 id="结果">结果&lt;/h2>
+&lt;ul>
+&lt;li>原模型结果&lt;/li>
+&lt;/ul>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">测试&lt;/th>
+&lt;th style="text-align:center">分数&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">原准确率&lt;/td>
+&lt;td style="text-align:center">0.8993&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">原召回率&lt;/td>
+&lt;td style="text-align:center">0.9017&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">F1-Score&lt;/td>
+&lt;td style="text-align:center">0.8919&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;ul>
+&lt;li>LRA&lt;br>
+单次 0.48 大降秩后 finetune 17300 iters, 接着 0.8 小降秩 finetune 40000 iters:&lt;/li>
+&lt;/ul>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">测试&lt;/th>
+&lt;th style="text-align:center">0.48分数&lt;/th>
+&lt;th style="text-align:center">0.48+0.8分数&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">准确率&lt;/td>
+&lt;td style="text-align:center">0.8947&lt;/td>
+&lt;td style="text-align:center">0.9181&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">召回率&lt;/td>
+&lt;td style="text-align:center">0.8868&lt;/td>
+&lt;td style="text-align:center">0.8157&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">F1-Score&lt;/td>
+&lt;td style="text-align:center">0.8813&lt;/td>
+&lt;td style="text-align:center">0.8489&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;ul>
+&lt;li>LRA + Force Regularization&lt;br>
+此版本由于原工程正在改进, 所以使用了新的方法 (修改了网络输出层的卷积个数以及输入的通道数, 准确率略微提高, 召回率变化不大)&lt;br>
+在新方法训练的模型下进行 0.003 Degradation 的 Force Regularization, 400 iters ( 50 iters/epoch ) 后 0.9 rank ratio 降秩, finetune 1000 iters后 继续 0.9 rank ratio 降秩, finetune 1300 iters 后得到收敛结果&lt;/li>
+&lt;/ul>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">测试&lt;/th>
+&lt;th style="text-align:center">源模型 FR&lt;/th>
+&lt;th style="text-align:center">第一次降秩&lt;/th>
+&lt;th style="text-align:center">第二次降秩&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">准确率&lt;/td>
+&lt;td style="text-align:center">0.9252&lt;/td>
+&lt;td style="text-align:center">0.9207&lt;/td>
+&lt;td style="text-align:center">0.9228&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">召回率&lt;/td>
+&lt;td style="text-align:center">0.7729&lt;/td>
+&lt;td style="text-align:center">0.8520&lt;/td>
+&lt;td style="text-align:center">0.8443&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">F1-Score&lt;/td>
+&lt;td style="text-align:center">0.8298&lt;/td>
+&lt;td style="text-align:center">0.8731&lt;/td>
+&lt;td style="text-align:center">0.8698&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h2 id="分析">分析&lt;/h2>
+&lt;ol>
+&lt;li>从 LRA 可以看出, 单次大降秩也能恢复到接近源模型的效果(召回率下降大约2%), 模型大小压缩明显(12.7M =&amp;gt; 4.8M), 但是再度降秩模型效果开始较大幅度下降(召回率再度下降7%), 且模型大小变化不大(4.8M =&amp;gt; 3.7M)&lt;/li>
+&lt;li>FR 后模型的召回率迅速降低, 但理论上在此基础上再进行多次降秩并最终 finetune 应该是能恢复效果的, 问题 loss 已经几乎收敛, 无法看出有明显下降, 召回率仍然有较大损失, 所以怀疑可能需要降低训练 force regularization, 和 learning rate, 或者有可能是 FR 未足够 finetune 的问题??&lt;/li>
+&lt;/ol>
+&lt;h2 id="后续">后续&lt;/h2>
+&lt;p>进行了FR再测试, 对原模型进行了更久的 finetune, 得到&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">测试&lt;/th>
+&lt;th style="text-align:center">分数&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">准确率&lt;/td>
+&lt;td style="text-align:center">0.9194&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">召回率&lt;/td>
+&lt;td style="text-align:center">0.9018&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">F1-Score&lt;/td>
+&lt;td style="text-align:center">0.9030&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>对于速度, 进行了几个小实验, 似乎该方法在小网络上会由于增加卷积层所以减慢前向速度, 而且比起低秩增速, 卷积层的增加带来的负面影响似乎更大. 至少以本项目来说是有些许降速的.&lt;/p></description></item><item><title>深度学习方法的人脸对齐</title><link>/p/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E6%96%B9%E6%B3%95%E7%9A%84%E4%BA%BA%E8%84%B8%E5%AF%B9%E9%BD%90/</link><pubDate>Thu, 19 Jul 2018 00:00:00 +0000</pubDate><guid>/p/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E6%96%B9%E6%B3%95%E7%9A%84%E4%BA%BA%E8%84%B8%E5%AF%B9%E9%BD%90/</guid><description>&lt;img src="/p/%E6%B7%B1%E5%BA%A6%E5%AD%A6%E4%B9%A0%E6%96%B9%E6%B3%95%E7%9A%84%E4%BA%BA%E8%84%B8%E5%AF%B9%E9%BD%90/1.png" alt="Featured image of post 深度学习方法的人脸对齐" />&lt;p>这部分是去年 9 月份开始的工作，算是第一次真正踏入深度学习的领域。具体工作也还算简单，就是复现一篇深度学习方法做的人脸对齐，当练练手。&lt;/p>
+&lt;h2 id="引言">引言&lt;/h2>
+&lt;p>因为深度学习的发展，很多传统的计算机视觉技术有了突破性进展，市面上也涌现了不少以前技术无法做到的产品，传统的像人脸检测、人脸对齐方面也有很大进步。这里就谈谈其中的一个，Deep Alignment Network [1]（下面简写 DAN）。&lt;/p>
+&lt;p>DAN 是用卷积神经网络做人脸对齐的工作，大致思想就是级联卷积神经网络，每阶段都包含前一阶段的输出作为输入，输出 bias，加上 bias 并摆正人脸关键点和输入图，用 输出点生成的 heatmap + 最后一层卷积输出的特征 reshape 图 + 摆正后的原图 作为下一阶段的输入。这样就能不断修正，以达到 robust 的结果。&lt;/p>
+&lt;h2 id="实现">实现&lt;/h2>
+&lt;p>作者在 GitHub 上开源了代码 [2]，用的是 Theano 实现。除了验证集设置、initshape 部分冗余 和 测试的部分代码 外，其他部分应该都是没问题的，直接训练得到的结果除了 Challenging subset 稍微要差一些外，其他都和论文一致，算是比较好复现的一个了。&lt;/p>
+&lt;p>我用的是 caffe 做复现，一方面是方便部署到安卓，另一方面是简单好用，改起来也容易。当时还没有 TensorFlow Lite，从各个方面来说 TensorFlow 都不太方便。当然，现在 TensorFlow 就更厉害了。&lt;/p>
+&lt;p>大体上要做的事就是先实现一阶段，写好方便训练、测试用的 python 代码，把数据集封装成 hdf5。因为一阶段没用到自定义层，所以直接写出网络结构的 prototxt 和 solver 就能训练了，训练好后就能作为二阶的 pre-trained model。当然一阶相当于直接 VGG + 回归输出，所以也可以直接看到效果了，我训练出来测试结果如下（测试方法对应代码里的 centers，也就是 inter-pupil normalization error）:&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Full set (%)&lt;/th>
+&lt;th style="text-align:center">Common subset (%)&lt;/th>
+&lt;th style="text-align:center">Challenging subset (%)&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">6.09&lt;/td>
+&lt;td style="text-align:center">5.29&lt;/td>
+&lt;td style="text-align:center">9.37&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>因为训练过程稍有不同，参数也没怎么调，而且后面发现 heatmap 有一点小问题，这个结果和原代码一阶训练的结果有些差异（AUC 差大约 3%），不过无妨，这个结果已经比传统的方法要强得多了，我们继续二阶训练。&lt;/p>
+&lt;p>二阶大部分代码可以和一阶共用，主要要做的部分就是把论文提到的几个自定义层实现，对应这四个地方：&lt;/p>
+&lt;ol>
+&lt;li>根据第一阶预测的结果和 mean shape 对比求出仿射变换参数&lt;/li>
+&lt;li>根据仿射变换参数对输入图做仿射变换，也就是对正原图啦&lt;/li>
+&lt;li>根据仿射变换参数对第一阶预测的结果做仿射变换，当然还要包括反变换的实现&lt;/li>
+&lt;li>根据对正的一阶预测结果产生 heatmap&lt;/li>
+&lt;/ol>
+&lt;p>然后还有一些 caffe 不支持的又比较常用的层，也就是 resize 层（也有叫 Interp 层或者 upsample 层，都是做插值，我个人认为最好用和部署框架相同的算法）。还有 loss 层，这个会影响到测试的结果和实际效果，我用的是和测试方法一致的度量来做 loss。&lt;/p>
+&lt;p>写好这些层的代码后还有两件事要做。一是单独测试每一层的输出，确保每层前向都各自没问题；二是要做 gradient check，保证反向传播的梯度数值正确。&lt;/p>
+&lt;p>完成一切之后，用一阶段模型作 pre-trained model，进行训练：&lt;/p>
+&lt;div align=center>
+&lt;img src="3.jpg" width="80%">
+&lt;p>训练过程&lt;/p>
+&lt;/div>
+&lt;h2 id="结果">结果&lt;/h2>
+&lt;p>最终结果：&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Full set (%)&lt;/th>
+&lt;th style="text-align:center">Common subset (%)&lt;/th>
+&lt;th style="text-align:center">Challenging subset (%)&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">5.02&lt;/td>
+&lt;td style="text-align:center">4.30&lt;/td>
+&lt;td style="text-align:center">7.95&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>可以看到和论文结果已经很接近了，这个任务也就大致完成了。比较遗憾的是这个网络不太好替换，后来我尝试把 backbone 从 VGG 更换成其他的轻量型网络，效果都不太理想，而且一到二阶段时由于三张原尺寸图 concat 做输入导致网络参数和运算量剧增也是一个很大的问题。另外，训练过程也可以看到存在非常大的过拟合。虽然有很多地方可以改进，不过毕竟不是首要的研发项目，所以后面就没有做下去了。&lt;/p>
+&lt;p>整个网络的结构框图如下：&lt;/p>
+&lt;figure align=center>
+&lt;img src="2.png" width="40%">
+&lt;/figure>
+&lt;p>[参考文献]:&lt;br>
+[1] &lt;a class="link" href="https://arxiv.org/pdf/1706.01789.pdf" target="_blank" rel="noopener"
+>《Deep Alignment Network: A convolutional neural network for robust face alignment》&lt;/a>&lt;br>
+[2] github: &lt;a class="link" href="https://github.com/MarekKowalski/DeepAlignmentNetwork" target="_blank" rel="noopener"
+>MarekKowalski/DeepAlignmentNetwork
+&lt;/a>&lt;/p></description></item><item><title>传统方法的人脸对齐</title><link>/p/%E4%BC%A0%E7%BB%9F%E6%96%B9%E6%B3%95%E7%9A%84%E4%BA%BA%E8%84%B8%E5%AF%B9%E9%BD%90/</link><pubDate>Sun, 15 Jul 2018 00:00:00 +0000</pubDate><guid>/p/%E4%BC%A0%E7%BB%9F%E6%96%B9%E6%B3%95%E7%9A%84%E4%BA%BA%E8%84%B8%E5%AF%B9%E9%BD%90/</guid><description>&lt;img src="/p/%E4%BC%A0%E7%BB%9F%E6%96%B9%E6%B3%95%E7%9A%84%E4%BA%BA%E8%84%B8%E5%AF%B9%E9%BD%90/1.png" alt="Featured image of post 传统方法的人脸对齐" />&lt;p>这里是关于应用传统方法做人脸对齐的经验总结，是在去年5月到7月的工作，也是我入职后的第一个正式项目，用的是 SDM (Supervised Descent Method) [1] 的方法，具体细节可能不太记得，所以会慢慢补完。&lt;/p>
+&lt;h2 id="引言">引言&lt;/h2>
+&lt;p>在深度学习杀到这领域前，有两种主流的人脸对齐方法，一个是14年的号称能达到 3000FPS 的 LBF，还有一种就是13年的 SDM。由于 3000fps 复现效果不理想，实际上 SDM 比起 3000fps 精度要高一些，而且还有不错的现成代码，当时也只是想把静态的人脸对齐做了，所以就选用了 SDM。&lt;/p>
+&lt;p>关于 SDM，其实是作者提出的一种非线性最小二乘优化的方法，类似牛顿步等方法，只不过回避了需要大计算量的 Hessian 矩阵和 Jacobian 矩阵的计算，人脸对齐算是它的一种应用。论文中的大致意思就是从牛顿步出发想办法把那两矩阵裹起来改为用迭代回归来学习，得到下降方向和大小，关于它更多的理论理解部分在官网上有很简单直观的介绍，这里暂时先放着。&lt;/p>
+&lt;h2 id="实现过程">实现过程&lt;/h2>
+&lt;p>我用的是 github 上 patrikhuber[2] 的开源代码，这个版本比论文的 SDM 稍微改进了一些，不过当然无论是模型大小、运算速度还是算法效果，都远不足以应用。所以我花了不少时间看论文，并在源代码基础上实现了一大堆算法模块，然后不停训练。当然很多想法实际上并没有奏效。&lt;/p>
+&lt;p>那段时间现在看起来是挺盲目的，想到什么加什么，甚至还纠结用 HOG 还是 DSIFT 做特征提取，还是两者混合 SDM 迭代时切换特征提取器。在诸如此类想法上花了不少工程上的功夫以达到能够随时切换配置做训练，更重要的是浪费了训练时间。实际上这些都不是制约最终效果的瓶颈，因为当时的特征提取的范围是限定的，瓶颈并不在于特征提取器本身，况且 HOG 和 DSIFT 本身差别并不大，在瓶颈时如果不找出瓶颈下功夫而着眼于其他不确定的想法往往是不明智的。&lt;/p>
+&lt;p>其实那时候很多的想法可能并不是没有奏效，而是被瓶颈掩盖了，造成了想法无效的错觉。换句话说，我们做算法的常常要评判什么想法是有效的，什么想法是无效的，而我觉得这种评判是要有所保留的，可能之所以想法无效是因为被什么我们没看到的因素所制约了，暂时行不通罢了。&lt;/p>
+&lt;p>扯远了，总之当时的瞎蒙乱撞最终幸运的还是找到了几个有用的改进方法。类似《Extended Supervised Descent Method for Robust Face Alignment》[3] 里提到的，一个是关于特征提取范围以及cell数量的改进，改成了顺应 SDM 迭代过程从大到小的范围、从粗到细的计算；第二个就是分开全局和局部来进行回归。这一些改进其实算是人脸对齐中比较常见的改进了，没有太多新意，不过对于全局和局部区分回归来说，比起对最终效果的改进，这个方法对模型大小和运算速度的改进更为明显。最后为了工程上的应用，这些方法都需要大量调参。&lt;/p>
+&lt;p>完成上面的这些其实也提升不了太多，关于这个项目最终提升最大的还是加入了人脸检测时得到的 5 个点做先验。也就是把 5 点扩展到 68 点，再加点 tricks 使这 68 点极其接近 ground truth，最后作为 init shape 输入到 SDM。这个方法让人脸对齐准确率和成功率大大增加，因为先验降低了回归的难度，把瓶颈推到了人脸检测时的五点回归成功率。虽然某些特殊情况可能会因为先验产生一些误导，不过也让通常情况下的对齐准确度达到非常高的地步，这是值得的。（后来我记得找到了一篇2017年7月的论文也有提到用类似我这个方法的改进版 SDM 和 LBF 来和他的深度学习方法对比的论文，只不过他用的是 JDA，我用的是 MTCNN，还有就是生成的 init shape 方法略有不同。）&lt;/p>
+&lt;h2 id="最终效果">最终效果&lt;/h2>
+&lt;p>至此，我的 SDM 人脸对齐的效果已经和当时竞品水平相当了，最终在 300w 上测试的结果为（用的 inter-pupil normalization error）&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Full set (%)&lt;/th>
+&lt;th style="text-align:center">Common subset (%)&lt;/th>
+&lt;th style="text-align:center">Challenging subset (%)&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">4.75&lt;/td>
+&lt;td style="text-align:center">4.09&lt;/td>
+&lt;td style="text-align:center">7.47&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>当然了，因为这个测试数字是用了五点 ground truth 做抖动的前提下得到的，所以没严格的参考价值，无法和其他公开方法做比较，不过也能反映这种方法的有效性，因为除了一些较为困难的情况，大多数时候通过 MTCNN 得到的五点都不会有太大偏差。&lt;/p>
+&lt;p>最终做了三个模型，分别是有五点先验的 68 点、106 点，以及没有五点先验的 106 点。模型大小都是 5MB 左右， 在小米 mix2 上速度 20ms 左右。demo 效果大致如下：&lt;/p>
+&lt;figure align=center>
+&lt;img src="2.png" width="60%">
+&lt;/figure>
+&lt;h2 id="结语">结语&lt;/h2>
+&lt;p>关于训练数据集其实还有非常多要写，比如我这里只用了 300-w 数据集，在这基础上翻转、模糊、调对比度，还有关于如何将 68 点数据集扩增到 106 点的，也参考复现了几篇论文。还有的话就是安卓端的部署，包括算法的移植、接口封装，运算速度的优化，模型的压缩等等。之后有空的话可能会整理补上。&lt;/p>
+&lt;p>[参考文献]:&lt;br>
+[1] &lt;a class="link" href="https://www.cv-foundation.org/openaccess/content_cvpr_2013/papers/Xiong_Supervised_Descent_Method_2013_CVPR_paper.pdf" target="_blank" rel="noopener"
+>《Supervised Descent Method and its Applications to Face Alignment》&lt;/a>&lt;br>
+[2] github: &lt;a class="link" href="https://github.com/patrikhuber/superviseddescent" target="_blank" rel="noopener"
+>patrikhuber/superviseddescent
+&lt;/a>&lt;br>
+[3] &lt;a class="link" href="http://pdfs.semanticscholar.org/5c82/0e47981d21c9dddde8d2f8020146e600368f.pdf" target="_blank" rel="noopener"
+>《Extended Supervised Descent Method for Robust Face Alignment》&lt;/a>&lt;/p></description></item><item><title>傅里叶变换随记</title><link>/p/%E5%82%85%E9%87%8C%E5%8F%B6%E5%8F%98%E6%8D%A2%E9%9A%8F%E8%AE%B0/</link><pubDate>Thu, 19 Apr 2018 00:00:00 +0000</pubDate><guid>/p/%E5%82%85%E9%87%8C%E5%8F%B6%E5%8F%98%E6%8D%A2%E9%9A%8F%E8%AE%B0/</guid><description>&lt;p>使用傅里叶变换的简易记录。&lt;/p>
+&lt;h2 id="原理">原理&lt;/h2>
+&lt;p>首先是公式&lt;br>
+$$ \mathcal{F}[f(t)]=\int_{-\inf}^{\inf}f(t)e^{-j\omega t}dt $$&lt;br>
+其中，角频率&lt;br>
+$$ \omega=k\omega_0=k\frac{2\pi}{T} $$&lt;/p>
+&lt;p>对于离散情况，将周期 T 用 N 点来表示，在采样频率下采一个周期共 N 点，时间 t 则用 n 表示，再根据欧拉公式&lt;br>
+$$ e^{jx}=cosx+jsin(x) $$&lt;br>
+可写成&lt;br>
+$$ a_k = \mathcal{F}[f(n)]=\sum_{n=0}^{N-1}f(n)[cos(2\pi k\frac{n}{N})-jsin(2\pi k\frac{n}{N})] $$&lt;br>
+同样的，逆变换：
+$$ f(n) = \frac{1}{N}\sum_{k=0}^{N-1}a_k[cos(2\pi k\frac{n}{N})+jsin(2\pi k\frac{n}{N})] $$&lt;/p>
+&lt;h2 id="实践">实践&lt;/h2>
+&lt;h3 id="对称性">对称性&lt;/h3>
+&lt;p>一般我主要是对图像或者其他实信号进行离散傅里叶变换，而因为&lt;br>
+$$ \begin{align*} a_k-a_{N-k} &amp;amp;= \sum_{n=0}^{N-1}f(n)\cdot e^{-jk\frac{2\pi}{N}n} - \sum_{n=0}^{N-1}f(n)\cdot e^{-j(N-k)\frac{2\pi}{N}n} \ &amp;amp;= \sum_{n=0}^{N-1}f(n) [e^{-jk\frac{2\pi}{N}n}-1\cdot e^{jk\frac{2\pi}{N}n}] \ &amp;amp;= \sum_{n=0}^{N-1}f(n)\cdot 2jsin(2\pi k\frac{n}{N}) \end{align*} $$&lt;br>
+当 f(n) 为实数时，值的实数为 0，说明傅里叶系数关于 N/2 对称，我们只需要计算前 N/2 个值就可以扩充为 N 个值。&lt;/p>
+&lt;h3 id="时域和频域">时域和频域&lt;/h3>
+&lt;p>对于空域上的操作可以换算成频域上的操作，反过来也是。所以对频域上进行值加减可以等价换算成傅里叶变换后在空域全图上进行加减：&lt;br>
+$$ \begin{align*} Y(j\omega) &amp;amp;= \sum_{n=0}^{N-1}(f(n)+g(n))\cdot e^{-j\omega n} \ &amp;amp;= \sum_{n=0}^{N-1}f(n)\cdot e^{-j\omega n} + \sum_{n=0}^{N-1}g(n)\cdot e^{-j\omega n} \ &amp;amp;= F(j\omega) + G(j\omega) \end{align*}$$
+乘法则是对应卷积。&lt;/p>
+&lt;h3 id="变换和逆变换">变换和逆变换&lt;/h3>
+&lt;p>对于实信号而言，若只取实部做分析，在正变换和逆变换上主要是数值大小上会差 N 倍（有些库的实现会自动做这个缩放），所以无论是对时域信号还是频域信号，做正变换或逆变换得到的结果理论上都是一样的（个别库会有差别）。&lt;br>
+如果是连续两次相同的变换则会导致相位上偏转 90 度。
+$$ \begin{align*} \mathcal{F^{-1}}{\mathcal{F}[f(n)]} &amp;amp;= \sum_{k=0}^{N-1}\sum_{n=0}^{N-1}[f(n)\cdot e^{-jk \frac{2\pi}{N}n}]e^{jk \frac{2\pi}{N}i} \ &amp;amp;= \sum_{k=0}^{N-1}\sum_{n=0}^{N-1}f(n)\cdot e^{jk \frac{2\pi}{N}(i-n)} \end{align*}$$&lt;/p></description></item><item><title>Kaggle "Amazon from Space" 经验分享</title><link>/p/kaggle-amazon-from-space-%E7%BB%8F%E9%AA%8C%E5%88%86%E4%BA%AB/</link><pubDate>Tue, 17 Oct 2017 00:00:00 +0000</pubDate><guid>/p/kaggle-amazon-from-space-%E7%BB%8F%E9%AA%8C%E5%88%86%E4%BA%AB/</guid><description>&lt;p>看了 Kaggle 亚马逊雨林卫星图分类比赛第一名 &lt;a class="link" href="http://blog.kaggle.com/2017/10/17/planet-understanding-the-amazon-from-space-1st-place-winners-interview/" target="_blank" rel="noopener"
+>Planet: Understanding the Amazon from Space, 1st Place Winner&amp;rsquo;s Interview&lt;/a>, 学到了些 trick, 这里记录一下&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>关于 precision 和 recall 的权衡, 可以在原有的 log loss 上增加 F_beta - score loss 来达到, 如:
+$$F_1 = 2\cdot\frac{precision\cdot recall}{precision+recall}$$
+而
+$$F_\beta = (1+\beta^2)\cdot\frac{precision\cdot recall}{(\beta^2\cdot precision)+recall}$$&lt;br>
+使用 F2-score 时, 代表 recall 比 precision 重要（由于 β 因子大于 1，recall 的增幅对 score 要更明显）, F0.5-score, 代表 precision 比 recall 重要（同理）&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>关于分类标签变量存在相关或部分对立的情况下的预测, 可以对最后一层输出的概率使用 ridge regression ( 岭回归, 即加了 L2 正则项的最小二乘, 鼓励回归参数尽可能利用到所有的相关变量, 惩罚可能存在的个别变量 dominant 的大正负值参数 cancel 得出结果的情况 ). 该方法也可以用在 ensemble 多个模型上, 最终对输出结果做 ridge regression&lt;/p>
+&lt;/li>
+&lt;/ol></description></item></channel></rss>

@@ -1,0 +1,810 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>论文笔记 on 次二小栈</title><link>/categories/%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0/</link><description>Recent content in 论文笔记 on 次二小栈</description><generator>Hugo -- gohugo.io</generator><language>zh-cn</language><lastBuildDate>Mon, 25 Apr 2022 00:00:00 +0000</lastBuildDate><atom:link href="/categories/%E8%AE%BA%E6%96%87%E7%AC%94%E8%AE%B0/index.xml" rel="self" type="application/rss+xml"/><item><title>StyleGAN</title><link>/p/stylegan/</link><pubDate>Mon, 25 Apr 2022 00:00:00 +0000</pubDate><guid>/p/stylegan/</guid><description>&lt;img src="/p/stylegan/arch1.webp" alt="Featured image of post StyleGAN" />&lt;h2 id="a-style-based-generator-architecture-for-generative-adversarial-networks">A Style-Based Generator Architecture for Generative Adversarial Networks&lt;/h2>
+&lt;p>&lt;a class="link" href="https://arxiv.org/pdf/1812.04948.pdf" target="_blank" rel="noopener"
+>https://arxiv.org/pdf/1812.04948.pdf&lt;/a>&lt;/p>
+&lt;h3 id="main-contribution">Main Contribution&lt;/h3>
+&lt;ol>
+&lt;li>提出了一种能够控制图像生成过程的生成器架构。通过注入噪声来自动、无监督地分离随机变化（人的各种不同属性，比如发型、雀斑等）以及高层特征（比如人的身份、姿态等特征），同时还能输出特定尺度的风格混合插值图像。&lt;/li>
+&lt;li>将输入 latent code 嵌入到中间 latent space，对 variation 因子是怎么在网络中表示的有深远影响。作者认为输入 latent space 必须遵循训练数据的概率密度会导致某种程度上必然的纠缠，而中间 latent space 不受限制从而可以免于纠缠（实验在原文 Table 4）。同时文章还提出了 &lt;em>perceptual path length&lt;/em> 和 &lt;em>linear separability&lt;/em> 两种新的自动化指标来衡量生成器的解缠度。&lt;/li>
+&lt;li>提出了新的高质量人脸数据集 FFHQ 以及配套代码和预训练网络。&lt;/li>
+&lt;/ol>
+&lt;h3 id="architecture">Architecture&lt;/h3>
+&lt;p>&lt;img src="/p/stylegan/arch1.webp"
+width="601"
+height="515"
+srcset="/p/stylegan/arch1_hub988efc80824a295e46270c7ce0704e1_32816_480x0_resize_q75_h2_box_2.webp 480w, /p/stylegan/arch1_hub988efc80824a295e46270c7ce0704e1_32816_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="archv1"
+class="gallery-image"
+data-flex-grow="116"
+data-flex-basis="280px"
+>&lt;/p>
+&lt;p>和传统生成器相比，使用常数作为输入，并将输入 latent code 经过一个网络映射到中间 latent space，输出 w 经过转换得到用于控制 AdaIN 的两组仿射变换参数 &lt;code>A：(ys, yb)&lt;/code>：&lt;/p>
+&lt;p>&lt;img src="/p/stylegan/AdaIN.webp"
+width="398"
+height="59"
+srcset="/p/stylegan/AdaIN_hub034331af88c74641966fb93bd4ea9bc_3766_480x0_resize_q75_h2_box_2.webp 480w, /p/stylegan/AdaIN_hub034331af88c74641966fb93bd4ea9bc_3766_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="AdaIN"
+class="gallery-image"
+data-flex-grow="674"
+data-flex-basis="1618px"
+>&lt;/p>
+&lt;p>AdaIN 调节各通道的权重来为控制风格混合程度提供基础。最后显示引入噪声 &lt;code>B&lt;/code> 来引导生成随机细节。&lt;/p>
+&lt;p>&lt;img src="/p/stylegan/design_FID.webp"
+width="589"
+height="188"
+srcset="/p/stylegan/design_FID_hu06c37b39999ce2e1a501b75ef96b3dcb_18058_480x0_resize_q75_h2_box_2.webp 480w, /p/stylegan/design_FID_hu06c37b39999ce2e1a501b75ef96b3dcb_18058_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="design_FID"
+class="gallery-image"
+data-flex-grow="313"
+data-flex-basis="751px"
+>&lt;/p>
+&lt;p>总的来说，基于 Progressive GAN baseline 的改进思路：B. 双线性上下采样（《Making Convolutional Networks Shift-Invariant Again》）C. latent space 映射网络和 AdaIN。D. 发现常规的输入 latent code 已经 no longer benefits，所以使用学习到的一组常数作为替代以简化架构，这时仅对 AdaIN 输入就已经有很好的结果。E. 引入噪声。F. 加上 &lt;em>mixing regularization&lt;/em> 来解相关相邻的风格，允许更细粒度地操控。&lt;/p>
+&lt;h3 id="properties">Properties&lt;/h3>
+&lt;p>关于为什么网络能学习到各种风格，并通过调节特定某种层的 latent code 就能控制特定某种风格来生成图像，作者的解释：&lt;/p>
+&lt;blockquote>
+&lt;p>We can view the mapping network and affine trans-formations as a way to draw samples for each style from a learned distribution, and the synthesis network as a way to generate a novel image based on a collection of styles. The effects of each style are localized in the network, i.e., modifying a specific subset of the styles can be expected to affect only certain aspects of the image.&lt;/p>
+&lt;p>To see the reason for this localization, let us consider how the AdaIN operation (Eq. 1) first normalizes each channel to zero mean and unit variance, and only then applies scales and biases based on the style. The new per-channel statistics, as dictated by the style, modify the relative importance of features for the subsequent convolution operation,but they do not depend on the original statistics because of the normalization. Thus each style controls only one convolution before being overridden by the next AdaIN operation.&lt;/p>
+&lt;/blockquote>
+&lt;h3 id="detail">Detail&lt;/h3>
+&lt;ol>
+&lt;li>&lt;em>Mixing regularization&lt;/em>&lt;br>
+在训练时，一部分图片（论文中用 90% 的训练集）使用两种 latent code (z1, z2) 来生成（在某层前后分别使用两种不同的 z1, z2 生成的 w1, w2 ），防止网络假设前后层风格相关导致依赖。加入这个后，在测试时使用多种 latent code 来混合输出 FID 也不会降低太多。&lt;/li>
+&lt;li>&lt;em>Stochastic variation&lt;/em>&lt;br>
+传统生成器从输入层送入随机因素，网络需要消耗容量去转换成所需的伪随机基图像，同时也很难避免周期性。文中采用卷积后直接加入噪声 &lt;code>B&lt;/code> 来回避这个问题，同时发现噪声的影响被网络很紧密地限定在了局部。作者假设对于生成器的任一点都有压力取生成新的内容，而最简单的方法就是依赖这些噪声。因为每层都有这些噪声的存在，所以不必从更早的激活层去得到这种随机性，这就导致了这种局部效应。（ &lt;em>这里噪声在不同层的大小对生成图像的纹理、局部细节和整体风格都有些微不足道的有趣的结果，可以看看论文里的图表&lt;/em> ）&lt;br>
+由于 latent code 是以同等参数改变所有层的（而且是以仿射变换形式，而非噪声所做的像素级增减），所以风格的全局影响会被剥离出来。这和以往的风格迁移方法（Gram matrix, channel-wise mean, variance 等编码图像风格，然后随空间变化的特征编码具体特例）是一致的。尝试改变噪声来控制风格会使空间上的生成有所偏差从而被判别器惩罚，所以最终不需要明确指导网络也会学习区分全局和局部的控制。&lt;/li>
+&lt;/ol>
+&lt;h3 id="disentanglement-studies">Disentanglement studies&lt;/h3>
+&lt;p>解缠的一般目的是：latent space 由线性子空间组成，每个子空间控制一种风格变化因素。然而 latent code 的抽样概率（一般是各维度等长来抽，也就是固定的球状分布）需要和训练数据的密度（比如分布是缺了块角的，只有部分人才有的风格）相匹配。这就是 &lt;em>intermediate latent space&lt;/em> 存在的目的，能通过学习将抽样空间扭曲到和训练数据相当的程度，从而能更加的线性。&lt;/p>
+&lt;p>&lt;img src="/p/stylegan/mapping.webp"
+width="577"
+height="257"
+srcset="/p/stylegan/mapping_huddac87116a33ef2f45ff6eb916338aca_22542_480x0_resize_q75_h2_box_2.webp 480w, /p/stylegan/mapping_huddac87116a33ef2f45ff6eb916338aca_22542_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="mapping"
+class="gallery-image"
+data-flex-grow="224"
+data-flex-basis="538px"
+>&lt;/p>
+&lt;p>作者觉得解缠的表示比起纠缠的表示在生成现实图像上会更加容易，所以假设有种压力让生成器去这么做。不幸的是，最近一些研究提出量化解缠度需要一个编码网络来将输入图像编码到 latent code（ &lt;em>这应该是更加接近现实的合理情况，pixel2style2pixel 算是一个&lt;/em> ），作者提出了两个替代方法来衡量解缠度。&lt;/p>
+&lt;ol>
+&lt;li>Perceptual path length&lt;br>
+直觉上来说，一个不那么曲折的 latent space 应该比曲折的 latent space 在感知上输出的图像变化更加平滑，而且在曲折的 latent space 上做插值就会出现明显的纠缠。于是作者提出一种方法，通过对随机两个 latent code 进行随机插值（可以是 z space 上球面插值，也可以是 w space 上线性插值），同时再增加微小增量（1e-4）取插值的邻域，计算两种插值 latent 生成的图像的 VGG 特征的差值平方和（lpips 距离）再除以微小增量的平方，随机采 100,000 次得到期望值作为衡量 latent space 到生成图像的平滑程度的方法。&lt;br>
+这里对 z 的插值和对 w 的插值会稍有不同，因为 z space 一般是训练时用的随机正态分布（代表训练集的范围，上图 b），而 w space 我们期望是解缠且 flatten 的（代表学习到的特征的范围，上图 c），那对 w 插值可能含有从 z space 映射不来的区域（如一些男性特性在女性中不存在，上图 c 的右下角）。所以区分为两种 PPL 方法，一种是 full-path，就是不管三七二十一取两个随机 z1,z2 生成的 w1,w2 做正常的线性插值得到 w3 及其微小增量的邻域 w4，另一种是限定 endpoints，插值 w 时只取对 z 没影响的小 w，也就是只取随机 z1 生成的 w1 及其微小增量的邻域 w2，这就能确保 w 在期望范围内（原话：&lt;code>It is therefore to be expected that if we restrict our measure to path endpoints, i.e.,t∈{0,1},we should obtain a smaller lW while lZ is not affected.&lt;/code>）&lt;/li>
+&lt;li>Linear separability&lt;br>
+作者提出一种通过超平面切分 latent space 将 latent 分到两个不同集的方法来衡量解缠度。首先要得到预训练的特定属性的分类器，用来检测 latent 对应生成图片是否存在对应属性。然后每属性采 100,000 个置信度大于一半的样本经过分类器，得到结果作为标签针对每个属性训练线性 SVM 分类器，计算条件熵 H(Y|X)，X 是 SVM 预测结果，Y 是预训练分类器的结果，最后综合 40 种属性求期望作为分类程度指标。&lt;/li>
+&lt;/ol>
+&lt;h2 id="analyzing-and-improving-the-image-quality-of-stylegan">Analyzing and Improving the Image Quality of StyleGAN&lt;/h2>
+&lt;p>&lt;a class="link" href="https://arxiv.org/abs/1912.04958" target="_blank" rel="noopener"
+>https://arxiv.org/abs/1912.04958&lt;/a>&lt;/p>
+&lt;h3 id="main-contribution-1">Main Contribution&lt;/h3>
+&lt;ol>
+&lt;li>重新设计归一化，解决 StyleGAN 生成图中存在的 artifacts，更换 Progressive GAN 为不需要改变拓扑也能完成由低到高分辨率生成的架构。&lt;/li>
+&lt;li>使用 perceptual path length 做 metric，并基于此对生成网络做正则化以达到平滑映射，最终发现从图像到 latent space 映射的效果比原始版本明显好得多。&lt;/li>
+&lt;/ol>
+&lt;h3 id="detail-1">Detail&lt;/h3>
+&lt;p>&lt;img src="/p/stylegan/arch2.webp"
+width="1201"
+height="507"
+srcset="/p/stylegan/arch2_hu2df713adadb847c27ed0613ab2642604_55730_480x0_resize_q75_h2_box_2.webp 480w, /p/stylegan/arch2_hu2df713adadb847c27ed0613ab2642604_55730_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="archv2"
+class="gallery-image"
+data-flex-grow="236"
+data-flex-basis="568px"
+>&lt;/p>
+&lt;ol>
+&lt;li>
+&lt;p>Architecture&lt;br>
+原始 StyleGAN 生成图中会出现水滴状 artifacts，而且从 64x64 分辨率特征图开始就被发现存在。文章指出这是 AdaIN 的问题，因为对每通道 feature map 做独立的 normalization 会毁坏掉根据各通道特征图间相对大小发现的任何信息。作者假设生成器故意将信号的强度信息偷偷传到 IN 来垄断统计特性，这样生成器就能像其他地方一样高效缩放信号了（&lt;em>照这么说所有 Instance Normalization 都会有这个问题，虽然我也没试过 IN 比 BN 要好的情况，即使 batch size 很小&lt;/em>）？实际上去掉 AdaIN 后 artifacts 就消失了。&lt;/p>
+&lt;p>作者将 AdaIN 分解为 normalization 和 modulation 两部分，并认为 modulation 的 bias 和 noise 会受到 normalization 中幅度操控的负面影响，而且发现把这两个操作移到 normalization 后会得到更加可预见的结果，而且 mean 也是可以去掉的，最后把常数输入的变换去掉也没有可以观察到的缺点，于是得出架构 (c)&lt;/p>
+&lt;p>去掉 normalization 可以让 artifacts 消失，但会失去现有的 style mixing 能力（因为前面层的 mixing 会导致幅度变化，没有及时通过 normalization 抵消这种变化就会影响后续层的 mixing）。作者提出一种通过对输入特征图的期望统计量做非显式强制性的 normalization 来维持这两种优点。具体而言就是对卷积 weights 做 modulation 和 demodulation（&lt;em>类似 BN 计算图融合，不过引入了动态风格调制的向量&lt;/em>）。modulation 就是每卷积核通道乘上对应调制系数，demodulation 的实现则需要一定弱化，假设输入 activations 是独立同分布的单位标准差的随机变量，那调制后输出 activations 的标准差就是调制后卷积参数的 L2 范数，所以除上这个数就当做 demodulation 了。作者指出这样统计分析在 xavier 和 kaiming 这些网络参数初始化技巧里有广泛应用，但很少用于替代目前这些依赖于数据的 normalization。之前也有工作指出对权重的单位归一化在 GAN 训练中是有益的（ &lt;em>WGAN 和 Spectral Normalization 应该也是这么回事&lt;/em> ）&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Quantitative analysis&lt;br>
+对生成模型的生成图像质量的量化评价依然是充满挑战性的主题。文章采用了三种方法衡量。一种是 FID，衡量在分类模型的高维特征空间中两分布的密度差异，另一种是 Precision 和 Recall，似乎是一种明确量化 生成图像和训练图像达到相似的百分比 和 能生成的训练数据的百分比？这两种都基于分类器网络，而近期研究表明它们在 ImageNet 上训练后更专注于纹理而不是形状（ [1] ），这和人类的认知方式相反（人更注重物体的形状），这会导致一些 FID 和 P&amp;amp;R 指标一致但质量却很不相同的图像出现。作者观察了第三种方法 percetual path length（PPL）与感知图像质量的关联，这是一种通过计算 latent space 上小扰动下的生成图像间的 LPIPS 距离来量化 latent space 映射到输出图像的平滑度的方法。作者发现平滑的映射空间似乎对应着更好的生成质量。作者假设生成器训练为了减轻判别器的惩罚，最高效方便的方式就是将生成高质量的 latent space 区域扩展，挤压低质量的 latent space 区域，这会在短期增加平均的输出质量，但累计的失真会影响训练动态以及最终图像生成质量。&lt;/p>
+&lt;p>话虽如此，也不能直接以 PPL 最小化作为目标（会导致 recall 降低），于是作者提出新的正则化方法。&lt;br>
+&lt;em>Lazy regularization&lt;/em>：首先为了降低正则化计算代价，作者发现正则项的计算频率可以低于 loss 的计算频率，比如 R1 正则化每 16 个 mini-batches 才计算一次也不会有损害。&lt;br>
+&lt;em>Path length regularization&lt;/em>：鼓励 W 变化固定步长会导致非零固定幅度的图像变化。这通过在图像空间随机方向步进，观察对应的 w 梯度？梯度应该和与 w 或图像空间方向无关的相同长度接近？这表明从 latent space 到图像空间是良定义的。&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;h3 id="r1r2-正则">R1/R2 正则&lt;/h3>
+&lt;p>为了收敛还用了一种正则化技巧 [2]，也就是 R1 正则化（和 R2 效果相当），大意是以判别器的梯度构建一种惩罚项，让判别器在原始数据分布和生成数据分布上尽可能梯度要小，从而接近收敛的条件（雅克比矩阵特征值有负实部无虚部，且两个分布绝对连续）&lt;/p>
+&lt;h3 id="references">References&lt;/h3>
+&lt;ol>
+&lt;li>&lt;a class="link" href="http://arxiv.org/abs/1811.12231" target="_blank" rel="noopener"
+>http://arxiv.org/abs/1811.12231&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://blog.csdn.net/w55100/article/details/88091704" target="_blank" rel="noopener"
+>https://blog.csdn.net/w55100/article/details/88091704&lt;/a>&lt;/li>
+&lt;/ol>
+&lt;h2 id="stylegan2-ada">StyleGAN2-ADA&lt;/h2>
+&lt;p>&lt;a class="link" href="https://arxiv.org/abs/2006.06676" target="_blank" rel="noopener"
+>https://arxiv.org/abs/2006.06676&lt;/a>&lt;/p>
+&lt;p>通过对判别器进行多策略数据扩增，大大减少了训练需要的样本量。为了保证对判别器的扩增不会影响到生成数据分布，需要动态调整扩增的 p。&lt;em>（不过实际尝试发现还是会有可能影响的，而且用几 k 数据集训练效果也只能差强人意）&lt;/em>&lt;/p>
+&lt;h3 id="references-1">References&lt;/h3>
+&lt;ol>
+&lt;li>&lt;a class="link" href="https://blog.csdn.net/WinerChopin/article/details/113666346" target="_blank" rel="noopener"
+>https://blog.csdn.net/WinerChopin/article/details/113666346&lt;/a>&lt;/li>
+&lt;/ol>
+&lt;h2 id="stylegan3">StyleGAN3&lt;/h2>
+&lt;p>&lt;a class="link" href="https://nvlabs-fi-cdn.nvidia.com/stylegan3/stylegan3-paper.pdf" target="_blank" rel="noopener"
+>https://nvlabs-fi-cdn.nvidia.com/stylegan3/stylegan3-paper.pdf&lt;/a>&lt;/p>
+&lt;p>StyleGAN2 存在像素粘连的情况，高层特征（纹理等）出现的位置不是由低层特征出现的位置所决定。作者阐明这是由于生成器卷积上采样非线性等结构不当导致的混叠现象（[1] 其实一直都违反采样定理，但因为精度至上所以一直不怎么在意），可以改进让其拥有等变性（平移旋转时纹理跟着生成目标）&lt;/p>
+&lt;p>看代码核心在于设计低通滤波器在生成器各级上采样时抑制掉高频，只在最高分辨率输出时才允许高频特征，也就是将上采样模块魔改了下&lt;/p>
+&lt;p>&lt;img src="/p/stylegan/style3_arch.webp"
+width="491"
+height="471"
+srcset="/p/stylegan/style3_arch_hua90172ca25fe8c5073a51904b4ec3a8c_26748_480x0_resize_q75_h2_box_2.webp 480w, /p/stylegan/style3_arch_hua90172ca25fe8c5073a51904b4ec3a8c_26748_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="104"
+data-flex-basis="250px"
+>&lt;/p>
+&lt;p>平移等变性则是增加了一些手工设计模块以及输入 latent 处理模块来加强。旋转等变性则是将所有 3x3 卷积换成 1x1 卷积，然后加大通道，并且修改下采样滤波器为径向对称型&lt;/p>
+&lt;h3 id="references-2">References&lt;/h3>
+&lt;ol>
+&lt;li>&lt;a class="link" href="https://arxiv.org/pdf/1904.11486.pdf" target="_blank" rel="noopener"
+>https://arxiv.org/pdf/1904.11486.pdf&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://blog.csdn.net/weixin_38443388/article/details/121050462" target="_blank" rel="noopener"
+>https://blog.csdn.net/weixin_38443388/article/details/121050462&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://zhuanlan.zhihu.com/p/425791703" target="_blank" rel="noopener"
+>https://zhuanlan.zhihu.com/p/425791703&lt;/a>&lt;/li>
+&lt;/ol>
+&lt;h2 id="application">Application&lt;/h2>
+&lt;p>StyleGAN 是一种很有“搞头”的生成器框架，因为它提供了能够生成和提取（增加 encoder）图像的高层、中层、低层语义信息的框架。通过迁移学习或其他方法，就能使用它来生成想要的数据集以及一些语义操控生成。&lt;/p>
+&lt;h3 id="model-interpolation">Model interpolation&lt;/h3>
+&lt;p>拿到两个 StyleGAN 生成模型，我们可以通过插值两者的参数来获得其“中间状态”。&lt;/p>
+&lt;h3 id="layer-swapping">Layer Swapping&lt;/h3>
+&lt;p>拿到两个 StyleGAN 生成模型，交换某些层的参数，由于低层低分率的参数会主导姿态、身份等信息，而高层高分辨率参数会主导颜色、纹理等信息，这样交换后也能得到混合的“中间状态”模型。&lt;/p>
+&lt;h3 id="latent-space-embedding">Latent Space Embedding&lt;/h3>
+&lt;p>实际更常见的情况，我们需要根据现实图像来引导 StyleGAN 生成图像，这就需要考虑怎么得到现实图像对应 StyleGAN 的 latent code，目前主要有两种方法：&lt;/p>
+&lt;ol>
+&lt;li>从随机 latent code 开始，然后用 VGG 之类的网络衡量现实和生成图像的差距，再根据 gradient descent 的方法来训练出最接近的 latent code。在 StyleGAN 的官方实现中有相应代码。&lt;/li>
+&lt;li>训练一个 encoder 将现实图像映射成 latent code。&lt;/li>
+&lt;/ol>
+&lt;p>两种方法各有优劣，(1) 主要优势在于稳定而且泛用，可以最大限度利用生成器的潜能，缺点是每张图片都要训练。（2）主要优势在于灵活且快速，可以利用 encoder 来进一步实现高级的语义操控，而且只需要一次训练，推理速度快，缺点是不能泛用。&lt;/p>
+&lt;h3 id="robust">Robust&lt;/h3>
+&lt;p>为了测试 StyleGAN 的 robust，采用上述 (1) 的 latent space embedding 方法来探索它的极限，可知道一些关于 latent code 和生成质量的重要细节，其中比较有趣的地方有几点：&lt;/p>
+&lt;ul>
+&lt;li>在一个域中训练好的 StyleGAN 也可以相当程度的通过 latent code 还原其他域的图片。不过该还原的程度和预训练的 StyleGAN 的 latent space 质量有显著关联（FFHQ 训练出来的生成器质量要比 LSUN 的好，实际尝试发现迁移后会变差，大概就是和样本质量有关吧）&lt;/li>
+&lt;li>FFHQ 训练出来的 StyleGAN 对仿射变换很敏感，特别是 shift_（以前也试过 shift 会导致生成质量差，大概是生成时默认了中心点的原因）（StyleGAN3 解决了这个问题）_&lt;/li>
+&lt;li>尽管可以还原其他域的图片，但对两张其他域的图片的 latent code 做线性插值然后生成得到的 Morphing 图会十分混乱无意义，而且隐约能看到有类似人脸的图样出现，说明即使是在生成其他域的 latent space 中人脸依然是主要部分&lt;/li>
+&lt;li>还原其他域图片时，从随机初始化的 latent 开始要比从平均的 latent 开始要好，还原预训练域结果相当（不过需要在 W+ space 下）&lt;/li>
+&lt;/ul>
+&lt;p>更多细节参考 [2]&lt;/p>
+&lt;h3 id="pixel2style2pixel">Pixel2Style2Pixel&lt;/h3>
+&lt;p>设计 encoder 将图像转换成 StyleGAN 的 latent code，再通过该 latent code 调节 StyleGAN 输出以达成各种任务，输出的 latent code 可以是 W space（512），也可以是 W+ space（18x512）&lt;/p>
+&lt;h3 id="encoder4editing">Encoder4Editing&lt;/h3>
+&lt;p>论文：https://arxiv.org/abs/2102.02766&lt;br>
+和 pSp 的 Inversion 任务只注重还原质量比起来增加了可编辑性，完成训练后编辑的方法分为三种：&lt;/p>
+&lt;ul>
+&lt;li>沿着一些语义方向（1x512）增加偏置&lt;/li>
+&lt;li>针对 GAN 空间做 PCA 结果，得出其和原 latent 的协相关偏置？加到原 latent 中&lt;/li>
+&lt;li>sefa 方法，也就是求生成器调制核的因式分解项（矩阵归一化内积求出特征向量），沿特征向量方向增加偏置&lt;/li>
+&lt;/ul>
+&lt;h3 id="hyperstyle">HyperStyle&lt;/h3>
+&lt;p>&lt;strong>论文&lt;/strong>： &lt;a class="link" href="https://arxiv.org/pdf/2111.15666.pdf" target="_blank" rel="noopener"
+>https://arxiv.org/pdf/2111.15666.pdf&lt;/a>&lt;br>
+&lt;strong>摘要&lt;/strong>：当前 StyleGAN 的 latent space 研究存在重建的精准度和可编辑性之间的 tradeoff 问题。与最近业界使用目标图像微调方法将生成器迁移到可编辑 latent 区域的方法不同，作者提出了用超网络调制 StyleGAN 参数来达到在可编辑 latent 区域重现给定图像的方法，并且设计达到了较低的参数量和较高的推理速度。&lt;br>
+&lt;strong>兴趣点&lt;/strong>：在域适应领域上，相比于 pSp、e4e、ReStyle 直接将源域 latent code 应用到目标域生成器上导致各种不匹配的特征增减，该方法通过给源域生成器训练超网络，然后将调制参数的 offset 应用到目标域生成器上来，再迁移 latent code，似乎会还原得更好。&lt;br>
+&lt;strong>锐评&lt;/strong>：加上 interfacegan 和 ganspace 修改，纠缠还是有不少的，反转效果还行，域外表现不怎么样，主要和 direction 在域外不好使相关。一次插值生成在 V100 上大约 25ms。总之，没大用。&lt;/p>
+&lt;h3 id="references-3">References&lt;/h3>
+&lt;ol>
+&lt;li>&lt;a class="link" href="https://www.justinpinkney.com/ukiyoe-yourself/" target="_blank" rel="noopener"
+>https://www.justinpinkney.com/ukiyoe-yourself/&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://arxiv.org/pdf/1904.03189.pdf" target="_blank" rel="noopener"
+>https://arxiv.org/pdf/1904.03189.pdf&lt;/a>&lt;/li>
+&lt;/ol></description></item><item><title>Pix2PixHD</title><link>/p/pix2pixhd/</link><pubDate>Mon, 09 Nov 2020 00:00:00 +0000</pubDate><guid>/p/pix2pixhd/</guid><description>&lt;img src="/p/pix2pixhd/pix2pix_arch.webp" alt="Featured image of post Pix2PixHD" />&lt;h2 id="pix2pixhd">Pix2PixHD&lt;/h2>
+&lt;p>《High-Resolution Image Synthesis and Semantic Manipulation with Conditional GANs》： &lt;a class="link" href="https://arxiv.org/pdf/1711.11585.pdf" target="_blank" rel="noopener"
+>https://arxiv.org/pdf/1711.11585.pdf&lt;/a>&lt;/p>
+&lt;h3 id="main-contribution">Main Contribution&lt;/h3>
+&lt;ol>
+&lt;li>增加一个 loss：真假样本的 Discriminator 的中间特征距离（Feature matching loss），再配合 VGG 之类 Perceptual Loss。&lt;em>算是最可看的一点。&lt;/em>&lt;/li>
+&lt;li>高分辨率生成。Generator 使用 Coarse-to-Fine 逐步生成高分辨率，也就是论文里的先训练低分辨率 Global，然后在外面套一层 Local Enhancer 把中间特征跳过去加起来以求得到高清高分辨率。Discriminator 则送进两种尺度的图像。&lt;em>经过实际验证多尺度输出+多尺度监督会更好，这些都算是落地标配了。&lt;/em>&lt;/li>
+&lt;/ol>
+&lt;h3 id="architecture">Architecture&lt;/h3>
+&lt;p>pix2pix：使用 UNet generator + patch-based discriminator，输出 256x256，直接输出高分辨率的话不稳定且质量低，于是进行改良。&lt;/p>
+&lt;ol>
+&lt;li>Coarse-to-fine generator
+&lt;img src="/p/pix2pixhd/pix2pix_arch.webp"
+width="1021"
+height="287"
+srcset="/p/pix2pixhd/pix2pix_arch_hu6199731767d3a35c48a188e67800c4b9_22146_480x0_resize_q75_h2_box_2.webp 480w, /p/pix2pixhd/pix2pix_arch_hu6199731767d3a35c48a188e67800c4b9_22146_1024x0_resize_q75_h2_box_2.webp 1024w"
+loading="lazy"
+alt="arch"
+class="gallery-image"
+data-flex-grow="355"
+data-flex-basis="853px"
+>&lt;/li>
+&lt;/ol>
+&lt;p>G1 为 global generator 处理 1024x512 图像，G2 为 local enhancer 处理 2048x1024 图像，同样的可以扩增出 G3 等等&lt;br>
+G1 采用架构为：https://arxiv.org/abs/1603.08155 ，其中提到的两个 Perceptual Loss Functions&lt;/p>
+&lt;div align=center>
+&lt;img src="FeatureReconstructionLoss.webp" width="50%">
+&lt;img src="StyleReconstructionLoss.webp" width="50%">
+&lt;/div>
+&lt;ol start="2">
+&lt;li>
+&lt;p>Multi-scale discriminators&lt;br>
+高分辨率需要大的感受野，而更大的卷积核或者更深的网络会有潜在过拟合的可能，且内存增长也很大。于是采用图像金字塔，对输入图缩小几次，得出几种尺度的图像，再根据缩放次数建立多个相同架构的 discriminators 来分别处理各自尺度（Patched Base），最后综合起来得出结果&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Feature matching loss&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;div align=center>
+&lt;img src="FeatureMatchingLoss.webp" width="60%">
+&lt;/div>
+使用各个 discriminator 各层特征的 L1 loss 来让生成图像和真实图像在判别器特征层面上相似，这可以说是类似 Perceptual Loss（在超分辨率和风格迁移很有用的方法）。实验进一步表明，一起使用会有更多提升
+结合 Feature matching loss 和 GAN loss，得到最终的 loss：
+&lt;div align=center>
+&lt;img src="FinalLoss.webp" width="60%">
+&lt;/div>
+&lt;ol start="4">
+&lt;li>
+&lt;p>Instance maps&lt;br>
+为了解决 semantic label 无法区分物体的缺点，需要引入 instance maps，但是由于事先不确定 instance 个数，所以不好实现。基于此，作者指出 boundary 才是其中最重要的信息，先计算出 instance boundary map（四邻域里有不同的 label 则为 1，否则为 0），再 concat 一起送入 generator 和 discriminator&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Image manipulation&lt;br>
+为了使 manipulation 结果多样化且合理，加入 instance-level feature embedding，和 semantic label 一起作为 generator 输入。具体来说，需要额外训练一个 encoder-decoder，最后一层按 instance 进行平均池化，再将池化结果 broadcast 到 instance 每个像素。这样处理完整个训练集后，对各类别使用 K-means 就可以得出多种 instance feature，推理时随机选取一种 concat 输入进行 generate 就可以完成目的。encoder-decoder 的具体训练方法见论文 3.4。&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;h3 id="implementation-notes">Implementation Notes&lt;/h3>
+&lt;ol>
+&lt;li>先训练 G1 再训练 G2，最后合在一起 fine-tune，作者提到此多分辨率 pipeline 易于建立，而且一般两种尺度就足够了&lt;/li>
+&lt;li>为了配合 Instance maps，semantic label 采用的 one-hot 形式&lt;/li>
+&lt;li>训练方法使用 LSGAN，Feature matching loss 的系数为 10&lt;/li>
+&lt;/ol>
+&lt;h3 id="experiments">Experiments&lt;/h3>
+&lt;ol>
+&lt;li>使用了语义分割网络对真实图像和生成图像进行分割，比较两者的 mIoU 等差异，结果 pix2pixHD 的方法得到的分割指标接近使用真实图像的指标：0.6389 : 0.6857&lt;/li>
+&lt;li>Human A/B tests&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>非限制时间，500 张 Cityscapes 图像比较 10 次，产生 5000 个结果，统计在两种方法中选取其中一个的概率。结果：未使用 instance map 下 pix2pixHD 和 pix2pix 是 94% : 6%，pix2pixHD 和 CRN 是 85% : 15%，VGG Perceptual Loss 似乎没有起到明显的正负面倾向，对结果影响在 1% 内&lt;/li>
+&lt;li>限制时间，随机在 1/8s - 8s 间选取时间来展示给受试者，判断那张图片更好，据称可以看出需要多长时间才能意识到两者的差异，大概就是某种程度上能比较差异的粗略显著性&lt;/li>
+&lt;/ul>
+&lt;div align=center>
+&lt;img src="exp2.webp" width="70%">
+&lt;/div>
+- 非限制 loss 比较，GAN + Feature matching + VGG Perceptual loss 比上单独 GAN loss、GAN + Feature matching loss 的 preference rate 分别为 68.55%，58.90%，稍微有一些提升，但不是很明显
+&lt;p>&lt;em>还剩下了几个实验，但这些实际效果都存疑，其实作用都不是特别明显，实验有些偏颇，generator 和 loss 方面的提升应该是最明显的&lt;/em>&lt;/p>
+&lt;p>&lt;strong>参考：&lt;/strong>&lt;/p>
+&lt;ol>
+&lt;li>&lt;a class="link" href="https://zhuanlan.zhihu.com/p/56808180" target="_blank" rel="noopener"
+>https://zhuanlan.zhihu.com/p/56808180&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://zhuanlan.zhihu.com/p/68779906?from_voters_page=true" target="_blank" rel="noopener"
+>https://zhuanlan.zhihu.com/p/68779906?from_voters_page=true&lt;/a>&lt;/li>
+&lt;/ol>
+&lt;h2 id="vid2vid">Vid2Vid&lt;/h2>
+&lt;p>Pix2PixHD 的视频生成改进，主要是针对 temporally incoherent，我没有看论文，只看了一下代码和博客，Generator 大致的修改就是：&lt;/p>
+&lt;ol>
+&lt;li>Pix2PixHD Global 的本体不变，输入改成前后多帧 concat 起来的图像，并且增加一支将过去几帧生成图像提取出特征加到主支上的分支，大概就是为了利用过去生成的图像来生成现在的图像。这样的话头几帧理论上就需要单独另外提供。&lt;/li>
+&lt;li>分出一支用来生成光流图和表示模糊程度？的掩码，用光流图 warp 最近一帧生成图像，根据掩码在 warp 的前一帧生成图和当前生成图中做加权，得出最终结果。&lt;/li>
+&lt;li>如果有前背景的掩码的话，再加一支类似 2 的分支，生成前景图和前景图掩码然后加权。&lt;/li>
+&lt;/ol>
+&lt;p>也就是说如果不使用前背景的话，实际需要两个 Pix2PixHD 的网络，输入增加前几帧，以及中间提取前几次生成图的特征后的耦合，还有一个光流 warp 的后处理。下面的图非常直观：
+&lt;a class="link" href="https://img-blog.csdnimg.cn/2019030516345690.gif" target="_blank" rel="noopener"
+>https://img-blog.csdnimg.cn/2019030516345690.gif&lt;/a>&lt;/p>
+&lt;p>&lt;strong>参考：&lt;/strong>&lt;/p>
+&lt;ol>
+&lt;li>&lt;a class="link" href="https://blog.csdn.net/maqunfi/article/details/88186935" target="_blank" rel="noopener"
+>https://blog.csdn.net/maqunfi/article/details/88186935&lt;/a>&lt;/li>
+&lt;/ol></description></item><item><title>DeepLab系列论文简略记录</title><link>/p/deeplab%E7%B3%BB%E5%88%97%E8%AE%BA%E6%96%87%E7%AE%80%E7%95%A5%E8%AE%B0%E5%BD%95/</link><pubDate>Thu, 01 Mar 2018 00:00:00 +0000</pubDate><guid>/p/deeplab%E7%B3%BB%E5%88%97%E8%AE%BA%E6%96%87%E7%AE%80%E7%95%A5%E8%AE%B0%E5%BD%95/</guid><description>&lt;p>这部分是关于语义分割网络 DeepLab 系列的三篇论文。尽管经验性的技巧很多，但就效果而言还是很不错的，有不少值得参考的地方。&lt;/p>
+&lt;h2 id="deeplab-semantic-image-segmentation-with-deep-convolutional-nets-atrous-convolution-and-fully-connected-crfs">DeepLab: Semantic Image Segmentation with Deep Convolutional Nets, Atrous Convolution, and Fully Connected CRFs&lt;/h2>
+&lt;p>三个贡献:&lt;/p>
+&lt;ol>
+&lt;li>明确表明了上采样滤波器或者叫 &amp;lsquo;空洞卷积&amp;rsquo; 是 dense prediction 任务中的重要工具. 空洞卷积允许明确控制滤波器在计算特征响应后的分辨率, 也允许有效放大滤波器的感受野, 从而无计算量和参数量增加地聚合更大的上下文信息&lt;/li>
+&lt;li>提出了空间金字塔空洞池化 ( ASPP ), 能在多尺度上分割物体&lt;/li>
+&lt;li>结合 DCNN 和概率图模型提升边缘准确度&lt;/li>
+&lt;/ol>
+&lt;p>方法简述：将后面一层 pooling 和 conv stride 改为 1, 换成 atrous conv, 最后并行多个不同 rate 的 atrous conv, 然后 fuse 在一起. 加上多尺度输入, COCO 预训练, randomly rescaling 扩增, CRF, 最终得出结果。&lt;/p>
+&lt;h2 id="rethinking-atrous-convolution-for-semantic-image-segmentation">Rethinking Atrous Convolution for Semantic Image Segmentation&lt;/h2>
+&lt;p>针对多尺度分割, 设计了级联或并联的 atrous conv 模块, 改进了 ASPP, 没有 CRF 后处理也达到了 SOTA&lt;/p>
+&lt;ul>
+&lt;li>Multi-grid Method
+&lt;ul>
+&lt;li>一个 block 内几个卷积, 分不同的 dilation rate, 比如三个卷积则原来 { 1,1,1 } 可以变为 { 1,2,4 }, 然后乘上该 block 的 dilation rate. 也就是说本来要 stride 2 的, 改用 atrous conv 后, 后面 block 卷积的 dilation rate 为 2 x { 1,2,4 } = { 2,4,8 }&lt;/li>
+&lt;li>但是 ResNet 的 block 难道不是只有一个 3x3 ??? 1x1 哪来的 dilation ???? 原文没有提及, github 有相关讨论, 大致可能一是 google 所用 ResNet Block 加了三个 3x3 卷积, 二是指多个 bottleneck 内的 3x3 卷积做 multi-grid&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>ASPP
+&lt;ul>
+&lt;li>加上 batch normalization&lt;/li>
+&lt;li>dilation rate 过大会导致 valid 的 weights 减少 ( 非 pad 0 区域与 filters 区域相交减小 ), 这会导致大 dilation rate 的 filters 退化, 为解决这个问题, 且整合 global context, 使用了 image-level 的 feature. 特别的, 在模型最后的 feature map 采用 global average pooling, 然后送进 256 个 1x1 卷积 BN 中, 然后双线性插值到需要的维度.&lt;/li>
+&lt;li>最终 ASPP 有: 一个 1x1, 三个 3x3 dilation rate { 6,12,18 } ( 缩小 16 倍时 ), 以及 image-level feature, 最终 concat 在一起做 1x1 卷积. 其中卷积都是 256 output channel 和 BN.&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;p>&lt;em>&lt;strong>原文提及主要性能提升来自于 Batch Normalization 的引入及 COCO 预训练. 实际本人尝试在小数据集上从 16s 到 8s 冻结 Batch Normalization 做 finetune, 最终效果并没有提升, 可能真的要在大量数据下才能得到较好的 Batch Normalization 参数做初始化吧&lt;/strong>&lt;/em>&lt;/p>
+&lt;h2 id="encoder-decoder-with-atrous-separable-convolution-for-semantic-image-segmentation">Encoder-Decoder with Atrous Separable Convolution for Semantic Image Segmentation&lt;/h2>
+&lt;p>融合了 Encoder-Decoder 和 SPP, 加上 depthwise 卷积的大量使用&lt;/p>
+&lt;h3 id="methods">Methods&lt;/h3>
+&lt;ol>
+&lt;li>Atrous Convolution 的 Encoder-Decoder&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>Encoder 阶段改进 Xception + DeepLabv3, 主要改进点为 &lt;em>atrous separable convolution&lt;/em>, 其实就是都大量使用 depthwise 卷积替换 ASPP 等卷积结构, 可以显著的降低计算复杂度并保持相似或更好的性能&lt;/li>
+&lt;li>Decoder 阶段在 DeepLabv3 输出端上采样 ( output_stride = 16 下 4 倍 ), 然后 concat 一个经过 1x1 降维后的网络低层特征, 再做 3x3 卷积, 然后上采样到原图大小. 这里也可以采用 depthwise 卷积提升效率.&lt;/li>
+&lt;/ul>
+&lt;ol start="2">
+&lt;li>修改 Xception&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>除输入流外加入了更多的层数&lt;/li>
+&lt;li>去掉 max-pooling, 以 stride depthwise 卷积替代&lt;/li>
+&lt;li>所有 3x3 depthwise 后加 batchnorm 和 ReLU &lt;em>&lt;strong>( 这个 ReLU 效果存疑 )&lt;/strong>&lt;/em>&lt;/li>
+&lt;/ul>
+&lt;h3 id="experiments">Experiments&lt;/h3>
+&lt;ol>
+&lt;li>关于 Decoder 的设计实验&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>这部分作者实验发现 Decoder 引入 before striding 的同分辨率 feature map 然后做 1x1 卷积压缩到 48 channel 再进行 concat 效果最好, 不过 mIoU 差距都比较小, 而且 64 channel 效果更差可以看出该选择可能与 Encoder 输出通道比例有关联, 玄学成分多些&lt;/li>
+&lt;li>还有就是 concat 后两个 3x3 256 卷积性能最好, 而且只做一个 skip-connection 会更高效&lt;/li>
+&lt;/ul>
+&lt;ol start="2">
+&lt;li>关于 Network Backbone&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>这里比较重要的一点就是 Decoder 的加入会带来 1%~2% 的性能提升, 这点在训练和测试相同 output stride 的情况下会比较明显, 不同的情况下比较不明显. ___( 这里总体计算量会增加几十 B, 个人认为在轻量级网络下不划算, 还是希望能有不会明显增加计算量的 decoder ) ___&lt;/li>
+&lt;li>另外, 作者使用 Xception 实验时发现 multi-grid 不会提升性能, 于是没有使用&amp;hellip;&amp;hellip;&amp;hellip;&amp;hellip;&amp;hellip;..&lt;/li>
+&lt;li>关于 pretrain, 在 COCO 上 pretrain 会带来大约 2% 的提升, 在 JFT 上 pretrain backbone 会再额外带来大约 1% 的提升&lt;/li>
+&lt;/ul>
+&lt;h3 id="conclusion">Conclusion&lt;/h3>
+&lt;p>DeepLabv3+ 采用 Encoder-Decoder 结构, 将 DeepLabv3 作为 Encoder, 并引入简单高效的 skip-connection 来恢复边缘. 还有就是改进 Xception 以及采用 atrous separable convolution 降低计算量. 总的来说没什么新鲜的, 都是整合之前的方法然后通过大量实验找到的最优最高效的结构, 或许这就是炼金术吧&amp;hellip;&amp;hellip;&lt;/p></description></item><item><title>MobileNet V2</title><link>/p/mobilenet-v2/</link><pubDate>Thu, 01 Mar 2018 00:00:00 +0000</pubDate><guid>/p/mobilenet-v2/</guid><description>&lt;p>这是关于轻量级网络 MobileNet 的改进版论文，作为万众瞩目的高效率骨干网络架构，它的更新意味着移动端网络的又一次改进。&lt;/p>
+&lt;p>原文链接： &lt;a class="link" href="https://arxiv.org/pdf/1801.04381.pdf" target="_blank" rel="noopener"
+>Inverted Residuals and Linear Bottlenecks: Mobile Networks for Classification, Detection and Segmentation&lt;/a>&lt;/p>
+&lt;h2 id="main-contribution">Main Contribution&lt;/h2>
+&lt;p>inverted residual with linear bottleneck. 输入低维压缩表征, 扩增到高维并进行 depthwise 卷积, 再通过线性卷积投射回低维表征. &lt;br>
+该卷积结构因为不需要完全实现大的中间 feature map, 还能显著降低内存占用&lt;/p>
+&lt;h2 id="pre-knowledge">Pre-Knowledge&lt;/h2>
+&lt;ol>
+&lt;li>
+&lt;p>Depthwise Separable Convolutions&lt;br>
+广泛应用的标准卷积替代品. 将标准卷积分解为两部分, 第一部分为 &lt;em>depthwise convolution&lt;/em>, 即每一个输入通道使用对应的一个卷积核来滤波, 第二部分为 &lt;em>pointwise convolution&lt;/em>, 即使用 1x1 卷积将上层特征线性组合得出新的特征.&lt;br>
+\(d_o\) 个 \(k \cdot k\) 标准卷积花费 \(h_i\cdot w_i\cdot d_i\cdot d_o\cdot k^2\), 而相对应的 depthwise 分离卷积花费 \(h_i\cdot w_i\cdot d_i\cdot k^2 + h_i\cdot w_i\cdot d_i\cdot d_o\), 相当于减少了近 \(k^2\) 倍的计算量 ( 实际是乘了 \(\frac{1}{d_o}+\frac{1}{k^2}\) 倍 )&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Linear Bottlenecks&lt;br>
+这里讨论激活层的基本属性, 文中将激活层的 feature map 看作维度 \(h_i\times w_i\times d_i\) 的激活张量.&lt;br>
+正式来说, 对于 \(L_i\) 层, 输入一组图像, 其激活组成了一个 &amp;quot; manifold of interest &amp;quot; ( 感兴趣流形? )&lt;br>
+这里提出了关于 manifold of interest 的一些假设, 并通过实验证明在 bottleneck 中使用非线性会损坏信息, 给出了通过在卷积 block 内插入 linear bottleneck 可以达到 capture 低维 manifold of interest 的目的&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>Inverted residuals&lt;br>
+受 bottlenecks 实际上包含所有必要信息的直觉启发, 文中直接将 bottlenecks 间作为 shortcuts&lt;br>
+最终该设计网络的层可以去除而不需要重新训练, 只减少一点点准确率&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>信息流的解释&lt;br>
+文中阐述了该结构能将 building blocks 的输入和输出域很自然的分割开来, 作为网络每层的容量, 以及输入输出间的非线性函数作为表达力 ?&lt;/p>
+&lt;/li>
+&lt;/ol>
+&lt;h2 id="architecture">Architecture&lt;/h2>
+&lt;p>Bottleneck &amp;amp; Network:&lt;/p>
+&lt;div align=center>
+&lt;img src="bottleneck.png">
+&lt;img src="network.png">
+&lt;img src="block.png">
+&lt;/div>
+在作者实验中, t 在 5~10 之间得出的结果大部分差不多, 只是在小网络中小的 t 值会稍微好一点, 大的网络中大的 t 值会稍微好一点
+在整体网络结构中, 第一个 bottleneck t 值为 1 会比较好, 另外在小的网络宽度下, 保留最后几层卷积层的卷积核数会提高小网络的性能
+&lt;h2 id="implementation-notes">Implementation Notes&lt;/h2>
+&lt;p>这部分主要是关于推理时内存占用的优化问题, 大致来讲, 传统的结构的内存占用由并行结构主导 ( 即残差连接之类的 ), 而这类结构需要内存为通过计算的输入和输出 tensor 的总和&lt;br>
+而文中提出的 building block 的内部操作均为 per-channel 的, 且随后的非 per-channel 操作具有很大的输入输出 size 比率 ( 即 bottleneck 的输入 channel 显著大于输出时的 channel ). 这样在内部操作中需要的内存占用仅仅为一个 channel 的 size, 而输出残差连接也因为 Invert Residual 减少了 channel 从而减少内存占用&lt;/p>
+&lt;h2 id="experiments">Experiments&lt;/h2>
+&lt;p>比较关心分割方面的, 所以这里只记录关于分割的实验&lt;br>
+实验在 PASCAL VOC 2012 上进行, 主要是比较各种 feature extractors 下的 DeepLab V3, 以及简化 DeepLab V3 的方法, 推理时采取不同的策略来提升性能. 结论如下&lt;/p>
+&lt;ol>
+&lt;li>推理策略加入 multi-scale 和 left-right flipped 会显著地增加计算量, 所以在终端设备应用上不考虑&lt;/li>
+&lt;li>output_stride 为 16 比 8 更高效&lt;/li>
+&lt;li>在倒数第二层基础上做 DeepLab V3 会更高效, 因为 channel 小, 而且得到的性能相似&lt;/li>
+&lt;li>去掉 ASPP 会减小很多计算量而且只损失一点性能 &lt;em>&lt;strong>( ASPP 没有进行 depth-wise 改进, 参见 DeepLab V3, 所以该结论在优化后的 ASPP 上实际效果存疑 )&lt;/strong>&lt;/em>&lt;/li>
+&lt;/ol>
+&lt;h2 id="ablation-study">Ablation study&lt;/h2>
+&lt;p>两个方面&lt;/p>
+&lt;ol>
+&lt;li>Invert residual connections 的有效性&lt;/li>
+&lt;li>违反常理的 linear bottleneck 能提升性能, 给 non-linearity 操作在 bottleneck 低维空间内损失信息的假设提供了支持&lt;/li>
+&lt;/ol></description></item><item><title>ShuffleNet</title><link>/p/shufflenet/</link><pubDate>Thu, 01 Mar 2018 00:00:00 +0000</pubDate><guid>/p/shufflenet/</guid><description>&lt;p>这部分是关于轻量级网络 ShuffleNet 的论文记录，主要是基于 channel shuffle 的想法来减少 CNN 中占大头的 1x1 卷积的计算量。&lt;/p>
+&lt;p>原文链接：&lt;a class="link" href="https://arxiv.org/abs/1707.01083" target="_blank" rel="noopener"
+>ShuffleNet: An Extremely Efficient Convolutional Neural Network for Mobile Devices&lt;/a>&lt;/p>
+&lt;h2 id="原文理解">原文理解&lt;/h2>
+&lt;p>介绍一种极其计算高效的 CNN 结构 ShuffleNet, 计算量可以控制在 10-150M FLOPs, 利用了 1x1 group conv, depth-wise conv 和 shuffle channel op.&lt;br>
+比起现有的方法专注于对基础网络进行 pruning, compressing, low-bit representing, 本文追求在非常有限的计算资源下 ( 几十或几百 MFLOPs ) 达到最好的效果. 目标是探索针对所需计算量范围定制非常高效的基础网络.&lt;br>
+ResNext 和 Xception 由于 1x1 dense 卷积过多在小网络中效率不高, 本文提出 &lt;em>pointwise group convolution&lt;/em> 减少 1x1 卷积的计算复杂度, 同时经过 &lt;em>channel shuffle&lt;/em> 来克服边缘效应&lt;/p>
+&lt;h3 id="channel-shuffle">channel shuffle&lt;/h3>
+&lt;p>在小网络下 1x1 卷积数量大很昂贵, 减少通道可能会对精度产生很大的损害. 最直观的解决方法是采用 channel sparse connections, 比如 group conv. 但这又导致输出部分仅与其相应输入的部分通道产生, 导致信息流通阻塞.&lt;br>
+通过 &lt;em>channel shuffle&lt;/em> : 输出 g x n 通道, 对输入先 reshape 到 (g, n), 转置然后 flatten. 可以优雅地解决问题.&lt;/p>
+&lt;h3 id="shufflenet-unit">ShuffleNet Unit&lt;/h3>
+&lt;p>基于 bottleneck 的结构 (b) (c):&lt;/p>
+&lt;div align=center>
+&lt;img src="Unit.png">
+&lt;/div>
+&lt;p>为了简单, channel shuffle 只加在第一个 1x1 后. 由于在低功耗设备下 depth-wise conv 的 &lt;code>computation/memory access ratio&lt;/code> 可能比 dense op 要差, 实际上并不能高效实施, 所以故意只在 bottleneck 中使用.&lt;/p>
+&lt;h3 id="network-architecture">Network Architecture&lt;/h3>
+&lt;p>参考设计: 类似 ResNet, bottleneck channel 是 output channel 的 1/4, 下层 channel 翻一倍.
+在 ShuffleNet 中, 大致相同计算量下, 明显可以看出, group 数越大, output channel 就要越多, 这有助于 encode 更多信息, 尽管有可能会导致单个卷积滤波器的作用降级&lt;br>
+另外, 在第一次 point-wise conv 时不采用 group conv, 因为输入通道数相对较小&lt;/p>
+&lt;h2 id="experiments">Experiments&lt;/h2>
+&lt;p>和 MobileNet 一样, 这里训练使用了不那么 aggressive 的 scale augmentation, 因为小网络通常会欠拟合而不是过拟合 &lt;strong>( 在 ENet 的实验中也印证了这点 )&lt;/strong>, 实验结论如下:&lt;/p>
+&lt;ol>
+&lt;li>&lt;em>pointwise group convolution&lt;/em> 有效, group 比不 group 好, Smaller models tend to benefit more from groups.&lt;/li>
+&lt;li>0.5x 情况下 group 比较大时会饱和, 准确率甚至下降. 但再减小 channel 到 0.25x, 发现增大 group 没有饱和, 反而收益更多了. &lt;strong>( 此处实验不充分, 不足以证明什么 )&lt;/strong>&lt;/li>
+&lt;li>Channel Shuffle 很有效, 特别在大 group 时.&lt;/li>
+&lt;li>实际加速由于内存访问等原因在移动平台上的呈现 理论加速 4 倍 = 实际加速 2.6 倍&lt;/li>
+&lt;/ol></description></item><item><title>Coordinating Filters for Faster Deep Neural Networks</title><link>/p/coordinating-filters-for-faster-deep-neural-networks/</link><pubDate>Wed, 15 Nov 2017 00:00:00 +0000</pubDate><guid>/p/coordinating-filters-for-faster-deep-neural-networks/</guid><description>&lt;img src="/p/coordinating-filters-for-faster-deep-neural-networks/ForceRegularization.png" alt="Featured image of post Coordinating Filters for Faster Deep Neural Networks" />&lt;p>这篇论文是在学习压缩模型时无意中看到的，发表在 ICCV 2017。因为看到它的 motivation 觉得挺有意思的（昴星团瞩目），刚好还有代码，于是就学习了一下，顺带看看能不能用在项目上。&lt;/p>
+&lt;p>原文链接： &lt;a class="link" href="https://arxiv.org/abs/1703.09746" target="_blank" rel="noopener"
+>Coordinating Filters for Faster Deep Neural Networks&lt;/a>&lt;/p>
+&lt;h2 id="原文理解">原文理解&lt;/h2>
+&lt;ul>
+&lt;li>压缩和加速 DNN 模型的工作&lt;/li>
+&lt;li>常规压缩 &lt;em>sparsity-based&lt;/em> 方法 &lt;em>Low-Rank Approximations ( LRA )&lt;/em>:
+&lt;ul>
+&lt;li>可以不必经过仔细的硬件/软件设计就能压缩和加速 DNN&lt;/li>
+&lt;li>原理在于滤波器之间冗余(相关性), 把大的矩阵近似成两个小矩阵相乘&lt;/li>
+&lt;li>此工作专注于压缩已经训练好的模型来达到最大化减小计算复杂性, 然后 retrain 来保持精度&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>本工作注重训练出 &lt;em>Lower-Rank Space&lt;/em> 的 DNN, 提出了 &lt;em>Force Regularization&lt;/em>:&lt;/li>
+&lt;li>主要是通过引入额外梯度 ( &lt;em>attractive forces&lt;/em> ) 微调参数来增强滤波器的相关性, 从而使得 LRA 后能获得更小的参数量&lt;/li>
+&lt;/ul>
+&lt;h2 id="方法">方法&lt;/h2>
+&lt;p>首先介绍 cross-filter LRA :&lt;br>
+LRA 为将大矩阵
+$$W\in\mathbb{R}^{N \times C \times H \times W}$$
+分解为一个低秩矩阵和一个1x1的卷积偏移
+$$\beta_m\in\mathbb{R}^{M \times C \times H \times W}, b\in\mathbb{R}^{1 \times C \times H \times W}$$
+那么输出的 feature map 为:&lt;/p>
+&lt;p>$$O_n\approx(\sum^M_{m=1}b_m^{(n)}\beta_m)*I = \sum^M_{m=1}(b_m^{(n)}F_m)$$&lt;/p>
+&lt;p>这里的
+$$F_m = \beta_m * I$$
+所以输出即低秩矩阵与输入的卷积的线性组合&lt;/p>
+&lt;p>然后是 &lt;em>Force Regularization&lt;/em>:&lt;br>
+从数学层面上看 &lt;em>Force Regularization&lt;/em>
+$$\Delta W_i = \sum^N_{j=1}\Delta W_{ij} = ||W_i||\sum^N_{j=1}(f_{ji}-f_{ji}w_i^Tw_i)$$
+$$W_i \gets W_i-\eta \cdot (\frac{\partial E(W)}{\partial W_i}-\lambda_s \cdot \Delta W_i)$$
+这里E(W)为损失，λs 为 trade off 因子，\(f_{ji}\) 如下：&lt;br>
+&lt;img src="/p/coordinating-filters-for-faster-deep-neural-networks/fji.png"
+width="406"
+height="176"
+srcset="/p/coordinating-filters-for-faster-deep-neural-networks/fji_huc221f7f61d7883f02cad0a9b555783ea_15248_480x0_resize_box_3.png 480w, /p/coordinating-filters-for-faster-deep-neural-networks/fji_huc221f7f61d7883f02cad0a9b555783ea_15248_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="230"
+data-flex-basis="553px"
+>
+&lt;img src="/p/coordinating-filters-for-faster-deep-neural-networks/fig_math.png"
+width="318"
+height="265"
+srcset="/p/coordinating-filters-for-faster-deep-neural-networks/fig_math_hua492dd4e003201b1a0be300d69ccf143_19877_480x0_resize_box_3.png 480w, /p/coordinating-filters-for-faster-deep-neural-networks/fig_math_hua492dd4e003201b1a0be300d69ccf143_19877_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="120"
+data-flex-basis="288px"
+>&lt;/p>
+&lt;p>在物理层面上看 &lt;em>Force Regularization&lt;/em> , 像是引力将参数聚集在一起&lt;/p>
+&lt;blockquote>
+&lt;p>Suppose each vector \(w_i\) is a rigid stick and there is a particle fixed atthe endpoint. The particle has unit mass, and the stick is massless and can freely spin around the origin. Given the pair-wise attractive forces (e.g.,universal gravitation) f_ji, Eq. (2) is the acceleration of particle \(i\). As the forces are attractive, neighbor particles tend to spin around the origin to assemble together.&lt;/p>
+&lt;/blockquote>
+&lt;p>作者认为, 增加 &lt;em>Force Regularization&lt;/em> 可以让一簇滤波器趋向于有相同的方向, 而由于数据损失梯度的存在使得该正则项不影响原本滤波器提取有判别力的特征的能力(存疑)&lt;/p>
+&lt;h2 id="实验">实验&lt;/h2>
+&lt;p>实验使用 baseline 作为 pretrained model. 原因是在相同最大迭代次数下, 从 baseline 开始训练比从头开始要有更好的精准度和速度提升的tradeoff, 因为 pretrained model 提供了精准度和高关联性的初始化条件.&lt;/p>
+&lt;p>实验结论:&lt;/p>
+&lt;ul>
+&lt;li>&lt;em>Force Regularization&lt;/em> 能在低层卷积保持低秩特性, 然后在高层卷积时有很大的压缩, 总体上看 rank ratio (低秩和全秩比) 大约为50%.&lt;/li>
+&lt;li>L2norm 在高 rank ratio 时表现得比较好, L1norm 在潜在低 rank ratio 时表现得更好.&lt;/li>
+&lt;/ul></description></item><item><title>GoogLeNet系列</title><link>/p/googlenet%E7%B3%BB%E5%88%97/</link><pubDate>Fri, 01 Sep 2017 00:00:00 +0000</pubDate><guid>/p/googlenet%E7%B3%BB%E5%88%97/</guid><description>&lt;p>这部分是关于 GoogLeNet 系列网络的两篇论文，涵盖了 Inception v1 到 v3。作为 CNN 发展进程中经典的模型，它通过大量实验思考总结了很多关于 CNN 在设计方面应当注意的事项，尽管没有 VGG 那般简洁好用易训练，而且工程设计感很浓重，但其中涉及到的各种实验和结果都是实打实的，对这些实验的解读可以印证和加深自己对深度神经网络的理解，建议参考原文。&lt;/p>
+&lt;p>&lt;a class="link" href="https://arxiv.org/pdf/1409.4842.pdf" target="_blank" rel="noopener"
+>Going deeper with convolutions&lt;/a>&lt;/p>
+&lt;p>&lt;a class="link" href="https://arxiv.org/pdf/1512.00567.pdf" target="_blank" rel="noopener"
+>Rethinking the Inception Architecture for Computer Vision&lt;/a>&lt;/p>
+&lt;h2 id="going-deeper-with-convolutions">Going deeper with convolutions&lt;/h2>
+&lt;h3 id="介绍">介绍&lt;/h3>
+&lt;ul>
+&lt;li>介绍一种新的结构, &lt;strong>Inception&lt;/strong>, 想法基于Hebbian principle和multi-scale processing的直觉, 可以在保持计算量恒定下加深和加宽网络&lt;/li>
+&lt;li>ILSVRC 2014: 相比AlexNet, GoogLeNet取得小12倍的参数以及高准确率&lt;/li>
+&lt;/ul>
+&lt;h3 id="动机和思考">动机和思考&lt;/h3>
+&lt;ul>
+&lt;li>性能瓶颈, 增强性能要增加模型大小, 但又加大了过拟合可能以及对数据的需求和计算量&lt;/li>
+&lt;li>解决之根在于稀疏化结构, 联合 Hebbian principle (&lt;code>neurons that fire together, wire together&lt;/code>) :&lt;/li>
+&lt;/ul>
+&lt;blockquote>
+&lt;p>Their main result states that if the probability distribution of the data-set is representable by a large, very sparse deep neural network, then the optimal network topology can be constructed layer by layer by analyzing the correlation statistics of the activations of the last layer and clustering neurons with highly correlated outputs. ( : &lt;em>&amp;ldquo;Provable bounds for learning some deep representations&amp;rdquo;&lt;/em> )&lt;/p>
+&lt;/blockquote>
+&lt;ul>
+&lt;li>问题在于当前计算设备对非固定形状的稀疏矩阵的数值计算不够高效. 使用 lookups 和 cache 带来的巨大开销使得稀疏计算得不偿失. 那么是否能够利用计算设备对 dense matrices 高效计算的优势, 在稀疏的架构上进行 dense matrices 的计算? 大量文献表明:&lt;/li>
+&lt;/ul>
+&lt;blockquote>
+&lt;p>clustering sparse matrices into relatively dense submatrices tends to give state of the art practical performance for sparse matrix multiplication. ( : &lt;em>&amp;ldquo;On two-dimensional sparse matrix partitioning: Models, methods, and a recipe.&amp;rdquo;&lt;/em> )&lt;/p>
+&lt;/blockquote>
+&lt;p>相信不久的未来类似的方法会应用到自动构建的非固定形状的深度学习架构上&lt;/p>
+&lt;ul>
+&lt;li>还有一个问题, 尽管推出的结构在计算机视觉上取得了成功, 但仍然有疑惑这种成功是否能归因于指导这种网络构建的思想. 这个问题即是在于自动系统是否能使用相似的算法在其他领域创建一个总体架构看上去相差很远, 但有相似的增益效果的网络拓扑&lt;/li>
+&lt;/ul>
+&lt;h3 id="结构细节">结构细节&lt;/h3>
+&lt;ul>
+&lt;li>
+&lt;p>Inception 核心思想基于如何在卷积视觉网络中找到最优局部稀疏结构, 这种结构能被 dense components 近似和覆盖&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>上层多输入聚合到下层单输出, 能够被1x1卷积表示, 加上大卷积聚合多尺度区域, 为了方便, Inception 取 1x1 3x3 和 5x5, 加入额外的并行pooling 通道也会对效果有所帮助.&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>高层后空间聚合需要减少, 于是要提高 3x3 5x5 卷积的比例
+&lt;img src="/p/googlenet%E7%B3%BB%E5%88%97/Inception-Naive.png"
+width="563"
+height="271"
+srcset="/p/googlenet%E7%B3%BB%E5%88%97/Inception-Naive_hu66b049f353142e59e1ac579fd8eeb24a_13459_480x0_resize_box_3.png 480w, /p/googlenet%E7%B3%BB%E5%88%97/Inception-Naive_hu66b049f353142e59e1ac579fd8eeb24a_13459_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="207"
+data-flex-basis="498px"
+>&lt;/p>
+&lt;/li>
+&lt;li>
+&lt;p>为了不让后期 5x5 与 pooling聚合(限定输入输出同 channel ) 导致的计算量高昂, 加入 1x1 卷积降维 ( &lt;code>even low dimensional embeddings might contain a lot of information about a relatively large image patch&lt;/code> )
+&lt;img src="/p/googlenet%E7%B3%BB%E5%88%97/Inception-Reduction.png"
+width="556"
+height="287"
+srcset="/p/googlenet%E7%B3%BB%E5%88%97/Inception-Reduction_hu838f0b552f41b089e14a7cea2d1e75ce_15244_480x0_resize_box_3.png 480w, /p/googlenet%E7%B3%BB%E5%88%97/Inception-Reduction_hu838f0b552f41b089e14a7cea2d1e75ce_15244_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="193"
+data-flex-basis="464px"
+>&lt;/p>
+&lt;/li>
+&lt;/ul>
+&lt;h3 id="训练细节">训练细节&lt;/h3>
+&lt;blockquote>
+&lt;p>Still, one prescription that was verified to work very well after the competition includes sampling of various sized patches of the image whose size is distributed evenly between 8% and 100% of the image area and whose aspect ratio is chosen randomly between 3/4 and 4/3. Also, we found that the photometric distortions by Andrew Howard [8] were useful to combat overfitting to some extent.&lt;/p>
+&lt;/blockquote>
+&lt;h3 id="最后">最后&lt;/h3>
+&lt;p>该结构在detection中也很有竞争力, 尽管没有做其他优化, 说明 Inception 结构的有效性, 会启发以后的模型结构趋向于 sparse.&lt;/p>
+&lt;h2 id="rethinking-the-inception-architecture-for-computer-vision">Rethinking the Inception Architecture for Computer Vision&lt;/h2>
+&lt;h3 id="介绍-1">介绍:&lt;/h3>
+&lt;ul>
+&lt;li>上一篇文章提出的 Inception 略复杂很难去修改网络, 如果只是简单地加大网络会导致计算性能优势瞬间消失. 而且上一篇文章并没有详细表明设计时各部分的影响因素, 所以很难让它用于新的领域同时保持高效率. 比如, 如果要加 Inception-style 的网络的容量, 最简单的只能加倍滤波器数量, 但这样会导致计算量和参数的4倍增加. 这很不友好, 特别如果效果甚微的话.&lt;/li>
+&lt;li>所以这篇文章开始讲述一些通用的原理和优化 ideas, 这些都是已经验证过对高效加大网络有用的方法.&lt;/li>
+&lt;li>广义上的 Inception-style 结构的搭建对这些约束是可以比较灵活自然的. 这是因为它大量使用了降维和并行结构, 这让它减轻了临近结构改变带来的影响. 当然, 为了保持模型的高质量, 使用 Inception 还是需要遵循一些指导原则.&lt;/li>
+&lt;/ul>
+&lt;h3 id="通用设计原理">通用设计原理:&lt;/h3>
+&lt;p>这里会描述一些通过对不同结构的 CNN 的大规模实验验证过的设计原理. 尽管有点投机的意味, 但严重背离这些原则趋向于恶化网络的质量, 改了之后一般都会有所提升.&lt;/p>
+&lt;ol>
+&lt;li>避免表达瓶颈 ( representational bottlenecks ), 特别是在网络的早期. 前向网络能表达为一个信息由输入到分类或回归器的有向无环图 ( acyclic graph ), 所以信息流方向是确定的, 输入到输出之间存在大量信息, 应该避免因极度压缩导致的瓶颈. 一般 表征 ( representation ) 的大小应该由输入到输出平缓地降低直到得到要直接用于任务的大小. 理论上, 信息内容不能仅仅以表征的维度来评判, 因为它舍弃了比如关联结构 ( correlation structure ) 等重要因素；维度仅仅用于提供信息内容的粗略估计.&lt;/li>
+&lt;li>高维表征更容易在网络局部中被处理. 增加每个卷积网络的 tile 的 activations 允许更多的解开的 ( disentangled ) 特征, 能加快网络训练.&lt;/li>
+&lt;li>空间聚合能通过较低维嵌入完成, 而且还不会损失表达力. 比如, 在进行一个更分散 ( more spread out ) 的卷积 ( 比如3x3 ) 之前, 在空间聚合之前降低输入表征的维度不会导致严重的不良影响. 我们推测临近的单元存在很强的关联, 如果输出是用于空间聚合的话, 导致降维损失的信息会很少. 鉴于这些信号应该很容易压缩，维度的减小甚至加快了学习.&lt;/li>
+&lt;li>平衡网络的宽度. 最优化网络的性能可以通过平衡每阶段的滤波器的数量和网络的深度来完成. 增加宽度和深度会使网络更高质量, 但要恒定计算量最优化提升需要两者并行增加. 计算预算因此应该用于平衡网络深度和宽度.&lt;/li>
+&lt;/ol>
+&lt;p>尽管好像挺有道理, 但以上的原则并不能直接拿来即用, 仅仅用在模棱两可的情况下会比较明智.&lt;/p>
+&lt;h3 id="分解卷积">分解卷积:&lt;/h3>
+&lt;ol>
+&lt;li>&lt;strong>分解成小卷积&lt;/strong>：通过使用临近结果将 5x5 分解成两个 3x3, 并在分解卷积间使用非线性激活.&lt;/li>
+&lt;li>&lt;strong>非对称卷积&lt;/strong>：将 nxn 卷积分解成 1xn + nx1 卷积可以进一步分解卷积, 但该方法在网络刚开始的地方不那么 work well, 但在中等大小的 feature map ( mxm 大小, m 在 12 到 20 之间 ) 上能取得很好的效果, 这种时候使用 1x7 和 7x1 卷积能达到很好的效果.&lt;/li>
+&lt;/ol>
+&lt;h3 id="辅助分类器的效用">辅助分类器的效用&lt;/h3>
+&lt;p>发现 辅助分类器存在与否在模型达到高准确率之前没有影响, 两者训练过程几乎完全相同. 只有在接近训练的尾声时, 带有辅助分类器的模型才会超过没有辅助分类器的模型, 最终达到一个稍高一点的收敛结果.
+此外, 此前的 GoogLeNet 使用了两个辅助分类器, 而接近输入端的辅助分类器实际上去掉也不会有负面影响. 所以之前关于它们对低层特征的帮助的假设更可能时错误的. 不过作者认为辅助分类器发挥了正则化的作用, 因为主分类器的性能会由于旁路实施了 batch-normalized 或者 dropout.&lt;/p>
+&lt;h3 id="高效的网格缩小">高效的网格缩小&lt;/h3>
+&lt;p>传统的卷积网络用 pooling 来减少特征图网格大小, 为了避免表达瓶颈, 可以使用先拓宽维度再 pooling 的方法. 比如, 输入 d x d 大小 k 通道, 输出 d/2 x d/2 大小 2k 通道, 那就先做 2k stride 1 的卷积, 然后再接上 pooling. 但这样计算消耗太大, 于是作者提出分成两支, 使用 stride 2 并行 pooling 和 卷积, 最后 concat 在一起.&lt;/p>
+&lt;h3 id="inception-v2">Inception-v2&lt;/h3>
+&lt;p>基于上述内容作者提出了改进版的 Inception, 网络大致变化是:&lt;/p>
+&lt;ol>
+&lt;li>开局 7x7 变成 3 个 3x3.&lt;/li>
+&lt;li>Inception 分成三类:&lt;/li>
+&lt;/ol>
+&lt;ul>
+&lt;li>第一类用于 35x35 的 feature map, 即分解 5x5 后的传统 Inception&lt;/li>
+&lt;li>第二类用于 17x17 的 feature map, 即非对称卷积版 Inception, 卷积核采用 7x7 大小&lt;/li>
+&lt;li>第三类用于 8x8 高维特征的 feature map, 即使用并行非对称卷积加大宽度后的 Inception&lt;/li>
+&lt;/ul>
+&lt;ol start="3">
+&lt;li>每类 Inception 间采用上述的高效的网格缩小方法&lt;/li>
+&lt;/ol>
+&lt;h3 id="使用-label-smoothing-正则化模型">使用 Label Smoothing 正则化模型&lt;/h3>
+&lt;p>一般 label 是离散且 one-hot 的, 而使用最小化 cross entropy 来训练的模型的话相当于对 label 做最大拟然估计, 其数学形式是 Dirac delta :&lt;br>
+$$q(k)=\delta_{k,y}$$
+在有限参数的情况下这是无法实现完全拟合的, 但模型却会趋向于这种形式, 这会导致两个问题: 一是不能保证泛化性能导致过拟合, 二是这种方式鼓励加大正确的预测和其他不正确预测之间的间隔, 加上在冲激处很大的梯度, 会导致模型的适应力下降. 直观来说就是对其预测太过自信了.&lt;br>
+为了降低模型的自信, 可以采用一个很简单的方法, 即将 label 的分布函数&lt;br>
+$$q(k|x)=\delta_{k,y}$$&lt;br>
+改成&lt;br>
+$$q&amp;rsquo;(k|x)=(1-\epsilon)\delta_{k,y}+\epsilon u(k)$$
+就是混上了一个固定的分布函数 u(k), 再经过平滑因子 ϵ 权重. 作者此处使用了平均分布 u(k)=1/K, 所以
+$$q&amp;rsquo;(k|x)=(1-\epsilon)\delta_{k,y}+\frac{\epsilon}{K} $$
+这样每个 k 都有一个最低值, 而最高值的影响被平滑影响. 在损失函数的角度上看也可以认为 u(k) 提供了正则化项.
+在 ILSVRC 2012 中, 作者采用了 u(k) = 1/1000 以及 ϵ = 0.1. 最终得到了恒定的 0.2% 的 top-1 和 top-5 效果提升.&lt;/p>
+&lt;h3 id="低分辨率输入的性能">低分辨率输入的性能&lt;/h3>
+&lt;p>为了比较不同输入分辨率对精准度的影响, 作者做个实验. 对三种输入分出三种网络配置 ( 为了公平对比保持计算量恒定) :&lt;/p>
+&lt;ol>
+&lt;li>299 × 299 receptive field with &lt;strong>stride 2&lt;/strong> and maximum pooling after the first layer.&lt;/li>
+&lt;li>151 × 151 receptive field with &lt;strong>stride 1&lt;/strong> and maximum pooling after the first layer.&lt;/li>
+&lt;li>79 × 79 receptive field with &lt;strong>stride 1&lt;/strong> and &lt;strong>without&lt;/strong> pooling after the first layer.&lt;/li>
+&lt;/ol>
+&lt;p>结果如下:&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">Receptive Field Size&lt;/th>
+&lt;th style="text-align:center">Top-1 Accuracy (single frame)&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">79 × 79&lt;/td>
+&lt;td style="text-align:center">75.2%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">151 × 151&lt;/td>
+&lt;td style="text-align:center">76.4%&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">299 × 299&lt;/td>
+&lt;td style="text-align:center">76.6%&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table></description></item><item><title>ResNet</title><link>/p/resnet/</link><pubDate>Fri, 01 Sep 2017 00:00:00 +0000</pubDate><guid>/p/resnet/</guid><description>&lt;p>这里是 ResNet 的论文，作为被广泛应用的骨干网络，它提出的几个概念可以说是 &lt;strong>着实可靠&lt;/strong> 地拓宽了网络设计的思路，对于广大摸着石头过河的工程师和研究者来说就是指出了一条明路。网络本身也高效、简洁且实用，可以作为 VGG 的上位替代。&lt;/p>
+&lt;p>原文链接：&lt;a class="link" href="https://arxiv.org/abs/1512.03385" target="_blank" rel="noopener"
+>Deep Residual Learning for Image Recognition&lt;/a>&lt;/p>
+&lt;h2 id="介绍">介绍&lt;/h2>
+&lt;p>网络深度对很多视觉任务都有很强的重要性, 但是仅靠简单的层堆积会存在梯度消失/爆炸问题. 虽然使用一些归一化初始技巧和中间归一化层可以很大程度解决这些问题, 但随着深度继续增加, 网络的精准度会逐渐饱和, 接着就会快速劣化, 这就是 &lt;em>degradation problem&lt;/em>. 出乎意料的是, 这些问题不是因为过拟合导致的, 实验证明增加更多的层数会导致更高的 &lt;em>训练误差&lt;/em>.&lt;br>
+本文, 作者通过引入一个深度残差学习框架解决了这个 degradation problem. 与其让每几个堆叠的层直接学习潜在的映射, 我们显式地让这些层去学习残差映射. 正式来讲, 即输出 H(x), 输入 x, 让非线性层学习 F(x):=H(x)-x, 那么原本的映射就变成了 F(x)+x. 这在前向网络中会被视为捷径 ( &amp;ldquo;&lt;em>shortcut connections&lt;/em>&amp;rdquo; ), 允许网络跳级连接, 在本文中可以简单看成 &lt;em>恒等映射 ( &amp;ldquo;identity mapping&amp;rdquo; )&lt;/em>.&lt;br>
+经过实验发现, 深度残差网很容易训练, 且很容易让精度随网络深度的增加而增加.&lt;/p>
+&lt;h2 id="残差学习">残差学习&lt;/h2>
+&lt;p>假设多次非线性函数能够渐进逼近复杂函数, 那么在维度不变的情况下该假设与渐进逼近残差是一样的.&lt;br>
+之所以改为学习残差, 是因为 degradation problem 这个反常的现象. 在残差学习的恒等映射情况下, 一个更深的模型的训练误差是应该不超过比它浅的模型的. degradation problem 告诉我们 solver 使用多次非线性函数在渐进逼近恒等映射时可能存在困难, 而残差学习则提供了将权重趋向 0 来达到恒等映射的拟合.&lt;br>
+当然, 在现实中, 恒等映射不太可能是最优的. 但这个改动可能有助于先决这个问题. 如果最优函数接近于恒等映射而非零映射, 那么 solver 应该很容易学习扰动来得到最优函数. 通过实验发现, 通常残差函数只有很小的响应, 这表明恒等映射的可以提供合理的先决条件.&lt;/p>
+&lt;h2 id="shortcut-恒等映射">shortcut 恒等映射&lt;/h2>
+&lt;p>本文采用每叠一些层就使用残差学习, 也就是建立一个 block:
+$$y=F(x,W)+x$$
+其中:
+$$F = W_2\sigma(W_1x)$$
+σ 为 ReLU, 省略了 bias. 在得到 y 后再做一次 ReLU.&lt;br>
+如果需要变化维度, 则:
+$$y=F(x,W)+W_sx$$
+W_s 为投影矩阵, 用来改变维度, 当然它也可以是个方阵用作线性变换, 但后续实验证明恒等变换就足够解决 degradation problem 了.&lt;br>
+F 是可以灵活改变的, 可以含有多层, 或者不同类型的层, 比如卷积层. 但如果 F 仅含有一层映射的话, 那还没有得到有效的效果验证.&lt;/p>
+&lt;h2 id="网络结构">网络结构&lt;/h2>
+&lt;p>为了对比, 作者构建了两个相同计算量的网络, 两种网络均为类似 VGG 的网络. 开始 7x7 stride 2, 然后 3x3, 每降低一次 feature map, double 一次 filters 数量, 使用 stride 2 卷积来降低 feature map, 堆叠 34 层和类似的 18 层. 最后做全局平均池化, 然后接 1000 分类器, 卷积后面都采用了 batch normalization 保证训练不失败.&lt;br>
+不同的是 ResNet 版加入了跳级连接, 降低 feature map 提升维度处分成两种策略, 一种填充 0 来扩增维度, 另一种上述提到的 1x1 升维, 两种方法都 stride 2 降低空间大小.&lt;br>
+实验得知, VGG 34 层表现比 18 层要差. 而且经过更多 iter 的训练发现问题没有解决.&lt;br>
+对于 ResNet 版, 采取第一种策略的, 34 层比 18 层错误率要少 2.8%, 更重要的, 34 层表现出明显更低的训练误差, 并且能很好泛化验证数据.&lt;br>
+对比两种网络的 18 层版, 发现 ResNet 能在训练早期更快的收敛.&lt;/p>
+&lt;p>ImageNet 上 10-crop top-1 error 实验结果如下:&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">&lt;/th>
+&lt;th style="text-align:center">plain&lt;/th>
+&lt;th style="text-align:center">ResNet&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">18 layers&lt;/td>
+&lt;td style="text-align:center">27.94&lt;/td>
+&lt;td style="text-align:center">27.88&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">34 layers&lt;/td>
+&lt;td style="text-align:center">28.54&lt;/td>
+&lt;td style="text-align:center">25.03&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">(PS: &lt;em>看上去似乎浅层下 ResNet 影响不大&lt;/em> )&lt;/td>
+&lt;td>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h2 id="恒等和投影-shortcuts">恒等和投影 shortcuts&lt;/h2>
+&lt;p>对比 ResNet 不同策略, 分为三种对比:&lt;/p>
+&lt;ol>
+&lt;li>零填充升维, 所有 shortcuts 都没有参数&lt;/li>
+&lt;li>升维时使用 1x1 卷积升维, 其他恒等&lt;/li>
+&lt;li>所有 shortcuts 都带有 1x1 卷积&lt;br>
+实验表明, 2 稍微比 1 好些 &lt;code>(top-1 25.03-&amp;gt;24.52)&lt;/code>, 作者认为这是因为 1 在升维时的零填充部分实际并没有进行残差学习; 3 轻微比 2 好些 &lt;code>(top-1 24.52-&amp;gt;24.19)&lt;/code>, 作者认为这是因为 3 在 shortcuts 处引入了额外参数. 微小的差异表明投影 shortcuts 对与解决 degradation problem 不重要.&lt;/li>
+&lt;/ol>
+&lt;h2 id="更深的瓶颈结构">更深的瓶颈结构&lt;/h2>
+&lt;p>为了节省训练时间, 作者把上面的 block 修改为 瓶颈 ( &lt;em>bottleneck&lt;/em> ) 设计. 即在每个 $F$ 内堆叠三层, 分别为 1x1, 3x3, 1x1 卷积层. 其中 1x1 用于升降维度, 使 3x3 作为有更低输入输出维度的瓶颈.&lt;/p>
+&lt;div align=center>
+&lt;img src="block.png">
+&lt;/div>
+&lt;p>对于瓶颈结构来说, shortcuts 策略的选择对模型大小和时间复杂度都有很重要的影响, 无参数恒等 shortcuts 可以让瓶颈模型更高效. ( &lt;em>?&lt;/em> )&lt;/p>
+&lt;p>作者在 50/101/152 层模型中使用了瓶颈结构和策略2的升降维.其各个配置如下:&lt;/p>
+&lt;div align=center>
+&lt;img src="Configuration.png">
+&lt;/div>
+&lt;p>（PS: &lt;em>值得注意的是 ResNet 50 层瓶颈版的 FLOPs 与 34 层相差不大, 网络的堆叠配置是一样的&lt;/em>）&lt;/p>
+&lt;p>在 ImageNet 验证集上的 10-crop 实验结果如下:&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">method&lt;/th>
+&lt;th style="text-align:center">top-1 err.&lt;/th>
+&lt;th style="text-align:center">top-5 err.&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">plain-34&lt;/td>
+&lt;td style="text-align:center">28.54&lt;/td>
+&lt;td style="text-align:center">10.02&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-34 1&lt;/td>
+&lt;td style="text-align:center">25.03&lt;/td>
+&lt;td style="text-align:center">7.76&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-34 2&lt;/td>
+&lt;td style="text-align:center">24.52&lt;/td>
+&lt;td style="text-align:center">7.46&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-34 3&lt;/td>
+&lt;td style="text-align:center">24.19&lt;/td>
+&lt;td style="text-align:center">7.40&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-50&lt;/td>
+&lt;td style="text-align:center">22.85&lt;/td>
+&lt;td style="text-align:center">6.71&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-101&lt;/td>
+&lt;td style="text-align:center">21.75&lt;/td>
+&lt;td style="text-align:center">6.05&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-152&lt;/td>
+&lt;td style="text-align:center">21.43&lt;/td>
+&lt;td style="text-align:center">5.71&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>在 ImageNet 验证集上单模型实验结果如下:&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align:center">method&lt;/th>
+&lt;th style="text-align:center">top-1 err.&lt;/th>
+&lt;th style="text-align:center">top-5 err.&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-34 2&lt;/td>
+&lt;td style="text-align:center">21.84&lt;/td>
+&lt;td style="text-align:center">5.71&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-34 3&lt;/td>
+&lt;td style="text-align:center">21.53&lt;/td>
+&lt;td style="text-align:center">5.60&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-50&lt;/td>
+&lt;td style="text-align:center">20.74&lt;/td>
+&lt;td style="text-align:center">5.25&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-101&lt;/td>
+&lt;td style="text-align:center">19.87&lt;/td>
+&lt;td style="text-align:center">4.60&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">ResNet-152&lt;/td>
+&lt;td style="text-align:center">19.38&lt;/td>
+&lt;td style="text-align:center">4.49&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align:center">最终在 ILSVRC 2015 提交中使用了两个 152 层模型的 ensembles, 得到 top-5 error 3.57.&lt;/td>
+&lt;td>&lt;/td>
+&lt;td>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table></description></item></channel></rss>
