@@ -1,6 +1,7 @@
 ---
 title: 模型嫁接
 date: 2021-06-23
+math: true
 description: 炼丹偏方之一
 categories: 
     - 技术经验
